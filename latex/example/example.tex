@@ -1,0 +1,2342 @@
+
+\documentclass[10pt]{article}
+
+% This file was written to demonstrate this package.
+\usepackage{figput}
+
+% Allows various tweaks to itemize as optional arguments.
+\usepackage{enumitem}
+
+% Allows \verb in footnotes
+\usepackage{fancyvrb}
+
+
+\begin{document}
+
+% Need this for fancyvrb to work.
+\VerbatimFootnotes
+
+
+% Getting this right may involve some experimentation.
+\SetInnerMargin{135pt}
+\SetOuterMargin{135pt}
+
+% Turn this on to show figures or off to save time.
+\NeverSkip
+
+% Some of the \FigPut commands refer to this code.
+\LoadFigureCode{externalcode.js}
+
+
+This document demonstrates some of the features of \textsc{FigPut}. It
+consists of a series of snippets of exposition. There are a few simple
+examples -- B\'ezier curves, the ellipse and diffiusion -- followed by
+a more extended example about gears.
+
+% Much of what follows uses the figput *environment*. This uses the
+% \FigPut *command*. 
+\begin{figure}[b!]
+\FigPut{bezier,175bp}[17bp,22bp,done,skip]
+\caption{A Cubic B\'ezier Curve}
+\label{fig-cubic-bezier}
+\end{figure}
+
+\section{Example: B\'ezier Curves}
+
+B\'ezier curves are a convenient way of defining curves in the
+plane. They can be defined using Bernstein polynomials. The 
+Bernstein polynomials of degree $n$ are defined by
+$$B_i^n(t) = {n \choose i} t^i (1-t)^{n-i},\qquad i=0,\ldots,n.$$
+A cubic B\'ezier curve is a linear combination of the Bernstein
+polynomials of degree 3:
+$$C(t) = \sum_{i=0}^3 p_i B_i^3(t),$$
+where the four $p_i$ are points in the plane and $t$ is limited to
+$[0,1]$. This can be written as the pair of equations $(x(t),y(t))=
+C(t)$, where
+\begin{eqnarray*}
+x(t) &=& x_1\cdot (1-t)^3 + x_2\cdot 3(1-t)^2t + x_3\cdot 3(1-t)t^2 +
+x_4\cdot t^3 \\
+y(t) &=& y_1\cdot (1-t)^3 + y_2\cdot 3(1-t)^2t + y_3\cdot 3(1-t)t^2 +
+y_4\cdot t^3,
+\end{eqnarray*}
+$(x_i,y_i) = p_i$ and the indices on the $p_i$ have been
+shifted. We have $C(0) = p_1$ and $C(1)=p_4$ and the other two points
+act as ``controls.'' See Figure (\ref{fig-cubic-bezier}), noting that
+the line determined by the pair of points controlling each end of the curve is
+tangent to the corresponding end-point of the B\'ezier curve.
+
+\section{Example: Drawing an Ellipse}
+
+One way to define an ellipse is illustrated by Figure
+(\ref{fig-ellipse-draw}). Choose two points, $F_1$ and $F_2$ (the
+{\bf foci}), and fix some $k>0$. The ellipse is then
+the set of points, $P$, satisfying
+$$d(P,F_1) + d(P,F_2) = k,$$
+where $d(A,B)$ is the distance from $A$ to $B$.
+
+The figure makes it clear why this is sometimes refered to as the
+``tacks and string'' definition. Imagine tacking each end of a bit of
+string, of length $k$, to the two foci; then tracing out the ellipse
+by holding a pencil at the limit of what the string will allow as the
+pencil travels about the foci. 
+
+\begin{figure}
+\begin{figput}{elldraw,175bp}[done,skip]
+  function elldraw(ctx) {
+
+  // The length of the string.
+  let k = 150;
+  
+  let yaxis = 85;
+  
+  // Limit these two points to be along the line y = yaxis.
+  let w1 = DraggableDotWidget.register(ctx,125,yaxis,'d1');
+  let w2 = DraggableDotWidget.register(ctx,225,yaxis,'d2');
+
+  // We need a LoopAnimWidget for an animation, even though we never want
+  // see the widget.
+  let numSteps = 1000;
+  let loopw = LoopAnimWidget.register(ctx,-100,100,1.0,
+  false, // hidden
+  numSteps, // steps per loop
+  0, // starting step
+  10, // ms time step
+  false,false,false,false,false, // nothing is visible
+  'loop');
+
+  w1.widgetY = yaxis;
+  w2.widgetY = yaxis;
+  
+  // The origin is the mid-point.
+  let cx = (w1.widgetX + w2.widgetX) / 2;
+  let cy = yaxis;
+
+  // c = distance from foci to center, a = x-radius and b = y-radius.
+  let c = Math.abs(w1.widgetX - cx);
+  let a = k / 2;
+  let b = Math.sqrt(a*a - c*c);
+
+  // The ellipse
+  let p = new FPath();
+  p.ellipse(cx,cy,a,b,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 1.5;
+  ctx.stroke(p);
+
+  // An animation, based on the parameterization p(t) = (a cos(t),b sin(t)).
+  // This based on the eccentric angle, so time won't seem to be
+  // constant, but that's OK. This is easier.
+  let t = 2*Math.PI * loopw.curStep / numSteps;
+  let px = a * Math.cos(t) + cx;
+  let py = b * Math.sin(t) + cy;
+
+  p = new FPath();
+  p.moveTo(cx - c,yaxis);
+  p.lineTo(px,py);
+  p.lineTo(cx + c,yaxis);
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+  
+  // In this case (unlike most others), the widgets must be explicitly drawn.
+  w1.draw(ctx);
+  w2.draw(ctx);
+}    
+\end{figput}
+\caption{Tacks-and-string Ellipse}
+\label{fig-ellipse-draw}
+\end{figure}
+
+\section{Example: Diffusion}
+
+The concept of diffusion is illustrated by Figure
+(\ref{fig-boltzmann}). Statistical mechanics and Boltzmann's equation
+explain concepts like heat transfer and the gas laws by modeling the
+random motion of many particles. These equations may be difficult to grasp,
+but an intuitive understanding is not difficult. At time zero, there
+is some set of particles on the left half of the box, each of which is
+moving with some randomly distributed momentum. The divider is removed
+and, over time, the particles distribute themselves more evenly
+throughout the box.  
+
+\begin{figure}
+\begin{figput}{diffusion,180bp}[0bp,30bp,done,skip]
+function diffusion(ctx) {
+  
+  // This is an open-ended animation.
+  let wanim = OpenAnimWidget.register(ctx,50,-32,1.0,
+    200, // horizontal size
+    true, // visible
+    10, // time step (ms)
+    10000, // decay
+    false, // steps not visible
+    true, // fast/slow visible
+    true, // pause/run visible
+    true, // time bar visible
+    false, // time bar not grabable.
+    'anim');
+
+  // A button for removing the divider.
+  let wbut = ButtonWidget.register(ctx,-85,32,'Open/Restart','but');
+
+  // Draw the enclosing box.
+  let p = new FPath();
+  p.moveTo(1,2);
+  p.lineTo(300,2);
+  p.lineTo(300,178);
+  p.lineTo(1,178);
+  p.closePath();
+  ctx.lineWidth = 3;
+  ctx.fillStyle = 'black';
+  ctx.strokeStyle = 'black';
+  ctx.stroke(p);
+
+  // These define the box for the particles.
+  let boxleft = 5;
+  let boxright = 150;
+  let boxbot = 4;
+  let boxtop = 175;
+  let boxdivider = 145;
+
+  if ((diffusion.started === undefined) || (wbut.resetState === true))
+    {
+      wbut.resetState = false;
+      wanim.curStep = 0;
+      
+      // Allocate 100 dots in the left half of the box.
+      // Each needs a position and direction.
+      diffusion.pos = [];
+      diffusion.dir = [];
+      for (let i = 0; i < 100; i++)
+        {
+          // Position
+          let r = Math.random();
+          let x = boxleft + r*(boxdivider - boxleft - 4);
+
+          r = Math.random();
+          let y = boxbot + r*(boxtop-boxbot)
+          diffusion.pos.push({x: x, y: y});
+
+          // Direction vector. Say each is evenly distributed over
+          // (0,1). That is not physically correct, but that's OK.
+          // To make this better, consider how the balls could bounce
+          // off of each other. That's messy, so I let them pass
+          // through one another, and only consider bouncing off walls.
+          let vx = (Math.random() - 0.50) / 2.0 ;
+          let vy = Math.sqrt(0.25*0.25 - vx*vx);
+          if (Math.random() > 0.50)
+            vy *= -1;
+
+          // Don't let either value be too small. It looks weird.
+          if (Math.abs(vx) < 0.05)
+            {
+              if (vx < 0.0)
+                vx = -0.05;
+              else
+                vx = 0.05;
+            }
+          if (Math.abs(vy) < 0.05)
+            {
+              if (vy < 0.0)
+                vy = -0.05;
+              else
+                vy = 0.05;
+            }
+
+          diffusion.dir.push({x: vx, y: vy});
+        }
+
+      diffusion.started = true;
+    }
+
+    // As noted, we only consider bouncing off walls. Assume that a ball
+    // moves from it's old position to new by the dir vector with each
+    // time step. If that would take the ball outside the rectangle, then
+    // we must consider reflection.
+    let dotR = 3;
+    
+    // Draw the "wall" if it's closed.
+    if (wbut.clickState === false)
+      {
+        p = new FPath();
+        p.moveTo(boxdivider,2);
+	p.lineTo(boxdivider,boxtop + 2);
+	ctx.lineWidth = 3;
+	ctx.stroke(p);
+      }
+    
+    // This depends on whether the wall is up.
+    let rightEdge = boxdivider - 3;
+
+    if (wbut.clickState === true)
+      rightEdge = 299;
+
+    for (let i = 0; i < diffusion.pos.length; i++)
+      {
+        let pold = diffusion.pos[i];
+        let vold = diffusion.dir[i];
+
+        let pnew = {x: pold.x + vold.x, y: pold.y + vold.y};
+        //console.log(i+ ' ' +pnew.y);
+        if (pnew.y < boxbot)
+          {
+            // Bounced off top edge.
+            // If each step takes 1 unit of time, then it hit the edget at
+            // Actually... be sloppy. I'm not really doing physics; I just
+            // want to demonstrate the FigPut system.
+            // The balls are moving slowly, so only allow them to reflect
+            // at the time of the step divisions.
+            diffusion.dir[i].y *= -1;
+          }
+          if (pnew.y > boxtop)
+            {
+              // Bottom edge bounce.
+              diffusion.dir[i].y *= -1;
+            }
+          if (pnew.x < boxleft)
+            // Left edge bounce.
+            diffusion.dir[i].x *= -1;
+          if (pnew.x > rightEdge - 2)
+            // Right edge bounce.
+            diffusion.dir[i].x *= -1;
+
+        // Redo, after taking reflections into account.
+        vold = diffusion.dir[i];
+        pnew = {x: pold.x + vold.x, y: pold.y + vold.y};
+
+        diffusion.pos[i] = pnew;
+
+        p = new FPath();
+        p.ellipse(pnew.x,pnew.y,dotR,dotR,0,0,2*Math.PI);
+        ctx.fill(p);
+      }
+}    
+\end{figput}
+\caption{Diffusion and Boltzmann's Equation}
+\label{fig-boltzmann}
+\end{figure}
+
+\newpage
+
+\section{Example: Gears}
+
+Gears like those in Figure (\ref{fig-gear-toy}) might work after a
+fashion, but it's rare to see such gears in anything other than a
+child's toy. As a rule, gears take the form shown in Figure 
+(\ref{fig-final-gear}). Why? 
+
+\begin{figure}[b!]
+\begin{figput}{badgear,130bp}[done,skip]
+function badgear(ctx) {
+  
+  var path1 = new FPath();
+  
+  let numTeeth = 17;
+  let cx = 70;
+  let cy = 65;
+  let inR = 40;
+  let outR = 50;
+  
+  path1 = new FPath();
+  
+  // A dot at the center.
+  path1.ellipse(cx,cy,2,2,0,0,2*Math.PI);
+  ctx.fillStyle = 'black';
+  ctx.fill(path1);
+  
+  // The teeth of the gear.
+  path1 = new FPath();
+  
+  // One degree, in radians, then 360 and 180 degrees.
+  let d = Math.PI / 180;
+  let d360 = 2 * Math.PI;
+  let d180 = Math.PI;
+  
+  let x = cx + inR * Math.cos(0);
+  let y = cy + inR * Math.sin(0);
+  path1.moveTo(x,y);
+  
+  let deltaA = Math.PI/numTeeth;
+  
+  for (let i = 0; i < numTeeth; i++)
+    {
+      x = cx + inR * Math.cos(2 * i * deltaA + deltaA);
+      y = cy + inR * Math.sin(2 * i * deltaA + deltaA);
+      path1.lineTo(x,y);
+
+      x = cx + outR * Math.cos(2 * i * deltaA + deltaA);
+      y = cy + outR * Math.sin(2 * i * deltaA + deltaA);
+      path1.lineTo(x,y);
+
+      x = cx + outR * Math.cos(2 * i * deltaA + deltaA + deltaA);
+      y = cy + outR * Math.sin(2 * i * deltaA + deltaA + deltaA);
+      path1.lineTo(x,y);
+
+      x = cx + inR * Math.cos(2 * i * deltaA + deltaA + deltaA);
+      y = cy + inR * Math.sin(2 * i * deltaA + deltaA + deltaA);
+      path1.lineTo(x,y);
+    }
+  
+  path1.closePath();
+  ctx.lineWidth = 1.5;
+  ctx.stroke(path1);
+  
+  // Now the triangular teeth.
+  numTeeth = 21;
+  cx = 230;
+  outR = 60;
+  
+  path1 = new FPath();
+  path1.ellipse(cx,cy,2,2,0,0,2*Math.PI);
+  ctx.fill(path1);
+  
+  path1 = new FPath();
+  
+  x = cx + + inR * Math.cos(0);
+  y = cy + inR * Math.sin(0);
+  path1.moveTo(x,y);
+  
+  for (let i = 0; i < numTeeth; i++)
+    {
+      x = cx + outR * Math.cos(i * d360/numTeeth + d180/numTeeth);
+      y = cy + outR * Math.sin(i * d360/numTeeth + d180/numTeeth);
+      path1.lineTo(x,y);
+            
+      x = cx + inR * Math.cos((i+1) * d360/numTeeth);
+      y = cy + inR * Math.sin((i+1) * d360/numTeeth);
+      path1.lineTo(x,y);
+    }
+  path1.closePath();
+  ctx.stroke(path1);
+}
+
+\end{figput}
+\caption{Crude Gear Designs}
+\label{fig-gear-toy}
+\end{figure}
+
+Figure (\ref{fig-gear-spoke}) illustrates the fundamental problem of
+gear design, using a particularly bad design. The ``gears'' here have
+been reduced to something more like spokes. The gear on the right
+rotates counter-clockwise at a constant rate and drives the gear on
+the left. As the gears rotate, the rate of rotation of the gear on the
+left will not be constant; at some positions, the left gear is nearly
+stationary and at other positions, it rotates much faster than the
+gear on the right. In addition, the point of contact slides,
+generating friction and wear. 
+
+\begin{figure}
+\begin{figput}{badspokegear,130bp}[done,skip]
+function badspokegear(ctx) {
+    
+  // Two gear-like pinwheels, where the one on the right drives the one on 
+  // the left. The idea is to show how the rotation surges, and why something
+  // like involvolute gears are needed.
+  //
+  // Modeling this is surprisingly fiddly. There's no need to make this
+  // fully general, for all possible arrangements, and it's not too bad
+  // if we restrict things a bit.
+  // 
+  // In general (too general), suppose that the two sets of spokes have
+  // lengths R1 and R2. Think of the gear on the right driving the
+  // gear on the left, with the gear on the right rotating ccw (under the
+  // usual RH coordinate system). WLOG, assume that the two axles are on the
+  // x-axis. We want to know where the two spokes initially touch "at
+  // the top," but it's actually easier to figure out where the last touch
+  // "at the bottom."
+  //
+  // To simplify, assume that all spokes (on both gears) have the same
+  // length, R. And assume that the centers of these gears are at
+  // (-x,0) and (x,0) so that the centers are 2x appart. Obviously, R > x
+  // for the gears to mesh at all.
+  // 
+  // Since the spokes are all the same length, it's easy to see that
+  // The angle of the RH spoke at the top is alpha above the x-axis when
+  // the spokes initally touch, and alpha below the x-axs when they cease
+  // to touch. Here, alpha is defined by
+  // cos(alpha) = x/R.
+  //
+  // Furthermore, let delta be the angle from spoke to spoke, so the
+  // number of spokes is 2 pi / delta. Assume that both gears have the
+  // same number of spokes. Note that delta must be less than 2 alpha
+  // for the spokes to always be in contact. Ideally, I want delta to be
+  // large enough so that no more than one pair of spokes (one on left and
+  // on on right) is ever in contact. Otherwise, it's more messy since
+  // you'd have to figure out which pair of spokes is doing the driving.
+  // In fact, it looks like I want delta = 2 alpha, or to put it another
+  // way, given delta, it follows that alpha = delta / 2.
+  //
+  // Now, think about what happens as the point of contact goes from the
+  // top, where the spoke barely touch, downward. The point of contact
+  // stays on the top of the left spoke and slides down on the right spoke.
+  // What you have is a triangle on the left with hypoteneuse R, and a 
+  // triangle on the right with hypoteneuse r. We need to determine r.
+  // Let beta be the angle of the right spoke above the x-axis. beta
+  // grows linearly with time, and is fully known...actually, beta
+  // *shrinks* if we think of it as the angle of the right spoke above
+  // the x-axis.  
+  //
+  // Let c be the x-coordinate of the point of contact, and let x1 be
+  // the distance from c to -x (the left axle) and x2 be the distance
+  // from c to +x (the right axle). We must have
+  // R^2 - x1^2 = r^2 - x2^2
+  // since the left and right triangles share the same vertical leg.
+  // And x1 + x2 = 2x by construction. The third equation we need
+  // is cos(beta) = x2/r or x2 = r cos(beta). 
+  // 
+  // Solve these three equations for x1, x2 and r in terms of R and x.
+  // First, use x1 = 2x - x2. Substitute:
+  // R^2 - x1^2 = r^2 - x2^2
+  // R^2 - (2x-x2)^2 = r^2 - x2^2
+  // R^2 - 4x^2 + 4x*x2 - (x2)^2 = r^2 - x2^2
+  // R^2 - 4x^2 + 4x*x2 = r^2
+  //
+  // Now use x2 = r cos(beta) and use C = cos(beta) for brevity:
+  // R^2 - 4x^2 + 4x*x2 = r^2
+  // R^2 - 4x^2 + 4x*(rC) = r^2
+  // r^2 - 4Cx r + 4x^2 - R^2 = 0.
+  // Solve for r by quadatic equation:
+  // r = (1/2) [ 4Cx \pm \sqrt{ 16C^2x^2 - 4(4x^2-R^2) } ]
+  // r = 2Cx \pm \sqrt{ 4C^2x^2 - 4x^2+ R^2 }
+  // r = 2Cx \pm \sqrt{ 4x^2(cos^2(beta) - 1 ) + R^2 }
+  // r = 2Cx \pm \sqrt{ -4x^2 sin^2(beta) + R^2 }
+  //
+  // Aside: note that the discriminant is always postive since R > x.
+  // I'm not sure what the two solutions here might "mean."
+  //
+  // This tells us what is going on from the point when the spokes touch
+  // at the top until you reach the point where they are aligned along the
+  // x-axis. However, we need the angle on the left -- that was the 
+  // whole point. We have angle beta on the right, and we want to know
+  // the angle, gamma, on the left.
+  //
+  // We have cos(gamma) = x1/R, where gamma is measured upwards from the 
+  // x-axis to the spoke in contact on the left gear (like normal).
+  //
+  // Now do something similar as the point of contact goes below the
+  // x-axis. It's the same basic calculation, except that the tip of the
+  // right spoke is in contact somewhere along the left spoke.
+  // Left and right are reversed.
+  //
+  // We still have x1 + x2 = 2x but now R^2 - x2^2 = r^2 - x1^2, and
+  // cos(beta) = x2/R. It's the same basic game. We get.
+  // 
+  // R^2 + 4x^2 - 4x*x2 = r^2
+  // just as before. But now use x2 = R cos(beta) (R, not r) and it's
+  // a simpler problem:
+  // R^2 - 4x^2 + 4x*x2 = r^2
+  // R^2 - 4x^2 + 4x R cos(beta) = r^2
+  // becomes
+  // r = \pm\sqrt{ R^2 - 4x^2 + 4x R cos(beta) }
+  //
+  // BUG: The calculation above treats the spokes as geometric lines, with zero
+  // thickness. Ideally, I should take the width of the lines into account.
+  
+  // The presence of this widget means that this is an animation.
+  // The code here will be called on a regular schedule.
+  let stepsPerRev = 500;
+  let startStep = 0;
+  let timeStep = 20;
+  
+  let w = LoopAnimWidget.register(ctx,
+    -LoopAnimWidget.Radius,LoopAnimWidget.Radius + LoopAnimWidget.TopHeight,0.75,
+    true,stepsPerRev,startStep,timeStep,
+    true,true,true,true,true,"wigname");
+
+  // BUG: I messed up when I wrote this and inadvertantly did all the
+  // measurements to the wrong scale. Thus, I have to undo my mistake.
+  // The real fix is to change all the constants below so that this
+  // scale() isn't necessary.
+  let mistakeT = ctx.getTransform();
+  ctx.scale(0.5,0.5);
+  
+  // The two gears are on opposite sides of this vertical line.
+  let xZero = 300;
+  
+  // You can change the number of teeth, but the surging is most apparent
+  // with four teeth (which is the minimum geometrically possible given
+  // the algebra. Somewhere around 6 or 7 teeth it becomes hard to see. 
+  // BUG: five teeth generates some kind of "jump" in the animation. 
+  // Not sure why.
+  let numTeeth = 4;
+  let spokeLength = 100;
+  
+  // The angle between spokes.
+  let delta = 2*Math.PI/numTeeth;
+  
+  // Spoke radius and thickness.
+  let R = spokeLength;
+  let spokeWidth = 2;
+  
+  // Distance of each spoke axis from the center line.
+  // I want the top pair of spokes to make contact at the same instant 
+  // that the bottom pair of spokes ceases contact. That requires
+  let x = R * Math.cos(delta/2);
+  
+  // Draw the spokes on the right. These are the drivers, so the angle rises
+  // linearly with time.
+  let cx = (xZero + x);
+  let cy = 140;
+  
+  var path1 = new FPath();
+  
+  // A dot at the center, probably not necessary.
+  path1.ellipse(cx,cy,2.0*spokeWidth,2.0*spokeWidth,0,0,2*Math.PI);
+  ctx.fill(path1);
+  
+  // Angle by which the gear has rotated, based on the step of the animation.
+  let rotA = w.curStep * 2 * Math.PI / stepsPerRev;
+  
+  for (let i = 0; i < numTeeth; i++)
+    { 
+      path1 = new FPath();
+      
+      let angle = i*delta + rotA;
+      while (angle < 0)
+        angle += 2 * Math.PI;
+      while (angle > 2*Math.PI)
+        angle -= 2 * Math.PI;
+      
+      path1.moveTo(cx,cy);
+      let x = cx + R * Math.cos(angle);
+      let y = cy + R * Math.sin(angle);
+      path1.lineTo(x,y);
+      
+      ctx.strokeStyle = "black";
+      ctx.lineWidth = spokeWidth;
+      ctx.stroke(path1);
+    }
+  
+  // Now the left, driven, set of spokes.
+  cx = (xZero - x);
+  
+  // Figure out which of the spokes on the right gear is the one in contact
+  // and doing the driving. It's the one whose angle relative to the 
+  // x-axis is between delta/2 above and delta/2 below the axis.
+  // To put it another way, its angle is in the range pi\pm delta/2.
+  // This could have been noted in the loop above.
+  let contactAngle = 0.0;
+  for (let i = 0; i < numTeeth; i++)
+    {
+      let angle = i*delta + rotA;
+      while (angle < 0)
+        angle += 2 * Math.PI;
+      while (angle > 2*Math.PI)
+        angle -= 2 * Math.PI;
+           
+      if ((angle < Math.PI + delta/2) && (angle > Math.PI - delta/2))
+        {
+          contactAngle = angle;
+          break;
+        }
+    }
+  
+  // contactAngle is the angle of the right gear's "contact spoke," but
+  // measured from the right. I want beta (in the notation above), measured
+  // from the left side, to put it in the range [-delta/2,+delta/2].
+  contactAngle = Math.PI - contactAngle;
+  
+  var gamma = 0;
+  if (contactAngle >= 0)
+    {
+      // The point of contact is above the x-axis. Slightly messier case.
+      let beta = contactAngle;
+      let disc = R*R - 4*x*x*Math.sin(beta)*Math.sin(beta);
+      let root = Math.sqrt(disc);
+      
+      // Conceptually, I'm not sure why, but this seems to be the right
+      // choice -- minus, not plus.
+      let r = 2 * Math.cos(beta) * x - root;
+      
+      let x2 = r * Math.cos(beta);
+      let x1 = 2 * x - x2;
+      
+      // I didn't address this in the long comment above, but
+      // (x1,sqrt(R^2-x1^2)) is the end-point of the left spoke in
+      // contact with the right spoke. The angle for this spoke is thus
+      // gamma, where cos(gamma) = x1/R.
+      gamma = Math.acos(x1/R);
+    }
+  else
+    {
+      // The point of contact is below the x-axis, hence the minus to 
+      // make beta positive.
+      let beta = -contactAngle;
+      let disc = R*R + 4*x*x - 4*x*R*Math.cos(beta);
+      let r = Math.sqrt(disc);
+      
+      let x2 = R * Math.cos(beta);
+      let x1 = 2 * x - x2;
+      
+      gamma = 2*Math.PI - Math.acos(x1/r);
+    }
+  
+  // A dot at the center, probably not necessary.
+  path1 = new FPath();
+  path1.ellipse(cx,cy,2.0*spokeWidth,2.0*spokeWidth,0,0,2*Math.PI);
+  ctx.fill(path1);
+  
+  // Draw the left spokes, based on gamma.
+  rotA = -w.curStep * 2 * Math.PI / stepsPerRev;
+  
+  for (let i = 0; i < numTeeth; i++)
+    { 
+      path1 = new FPath();
+      
+      path1.moveTo(cx,cy);
+      let x = cx + R * Math.cos(i*delta + gamma);
+      let y = cy + R * Math.sin(i*delta + gamma);
+
+      path1.lineTo(x,y);
+
+      ctx.lineWidth = spokeWidth;
+      ctx.stroke(path1);
+    }
+  
+  // BUG: Undo the above fix of my scaling mistake.
+  ctx.setTransform(mistakeT);
+}    
+\end{figput}
+\caption{Maybe the Worst Possible Gears?}
+\label{fig-gear-spoke}
+\end{figure}
+
+Understanding how to design gears without the kind of surging motion
+and wear inherent in the gears of Figure (\ref{fig-gear-spoke})
+explains why nearly all modern gears take the form of Figure
+(\ref{fig-final-gear}). The most glaring problem with the
+spoke-like gears is the way their motion varies -- imagine riding in a
+car with a gear-train based on such gears!
+
+Gears typically have what's called \emph{conjugate action},
+meaning that the ratio of their rates of rotation is constant,
+with no surging or lagging. Sometimes this is also called the
+\emph{fundamental law of gearing}, although it would be more accurate
+to call it a ``commonly desired feature,'' rather than a ``law.''
+Arranging the teeth of gears so that they have conjugate action is
+surprisingly tricky.
+
+\subsection{The Involute}
+  
+Figure (\ref{fig-basic-gear-constraints}) shows a cam and a lever-arm
+pushing against each other, causing them to rotate about their
+respective axes. Imagine that the cam rotates counter-clockwise,
+pushing the arm downwards. There are several crucial observations:
+\begin{enumerate}[itemsep=-1pt]
+\item The two curves must be tangent at the point of contact.
+\item The force from one part to the other must be directed along a
+  line perpendicular to the two curves at the point of contact. Call
+  this the \emph{line of action}.
+\item Let $P$ be point where the line of action intersects the line
+  connecting the two centers of rotation. This is called the
+  \emph{pitch point}. The instantaneous ratio of
+  the two rates of rotation is equal to the ratio of the distances
+  from $P$ to each of the centers of rotation.
+\end{enumerate}
+In conclusion, if two gears are to have conjugate action, then the
+pitch point must be fixed.
+
+\begin{figure}
+\begin{figput}{gearconstraints,120bp}[done,skip]
+function gearconstraints(ctx) {
+
+  // A static figure. No widgets.
+  //
+  // I wrote this before I changed the framework to assume a RH coordinates
+  // system. Instead of messing around changing the values below, each path
+  // is reflected and translated, much like a transformation matrix.
+
+  // Cam center.
+  let cax = 250;
+  let cay = 80;
+  let ra = 5;
+
+  let p = new FPath();
+  p.ellipse(cax,cay,ra,ra,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 0.4;
+
+  p = p.reflectX();
+  p = p.translate(new Point2D(0,120));
+  
+  ctx.stroke(p);
+
+  // Cam itself
+
+  // Right upper
+  let cs = 15; // space to right of axis
+  let h1 = 60; // height above 
+  let tan1 = 25; // tightness of tangents
+  let tan2 = 25;
+
+  p = new FPath();
+  p.moveTo(cax+cs,cay);
+  p.bezierCurveTo(cax+cs,cay - tan1,
+    cax-cs + tan2,cay-h1,
+    cax-cs,cay-h1);
+
+  // left upper
+  let h2 = 70; // how far left
+  let t1 = 20; // thickness of arm
+  tan1 = 4;
+  tan2 = 3;
+  p.bezierCurveTo(cax-cs-tan1,cay - h1,
+    cax-cs - h2,cay - h1,
+    cax-cs - h2,cay - h1 + t1);
+
+  // Lower left
+  let h3 = 40; // how far back right
+  p.bezierCurveTo(cax-cs-h2,cay - h1 + t1 + tan2,
+    cax-cs - h2,cay - h1 + 2*t1,
+    cax-cs - h2 + h3,cay - h1 + 2*t1);
+
+  // Inner concave
+  tan1 = 20;
+  tan2 = 20;
+  p.bezierCurveTo(cax-cs-h2 + h3 + tan1,cay - h1 + 2*t1,
+    cax-cs,cay - tan2,
+    cax-cs,cay);
+
+  // lower left below
+  tan1 = 8;
+  tan2 = 8;
+  p.bezierCurveTo(cax-cs,cay + tan1,
+    cax-tan2,cay + cs,
+    cax,cay+cs);
+
+  // lower right below
+  // BUG: It's hard to get these curves to meet smoothly. Need a better 'close'.
+  tan1 = 17;
+  tan2 = 10;
+  p.bezierCurveTo(cax + tan1,cay + cs,
+    cax + cs,cay - tan2,
+    cax + cs,cay);
+
+  ctx.lineWidth = 2.0;
+
+  p = p.reflectX();
+  p = p.translate(new Point2D(0,120));
+  
+  ctx.stroke(p);
+
+  // Now something similar for the long arm.
+  // The easiest way to do this is to draw it horizontal, but rotate all the
+  // points by some angle so that the arm touches the cam.
+  cax = 30
+  cay = 100;
+  
+  p = new FPath();
+  p.ellipse(cax,cay,ra,ra,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 0.4;
+
+  p = p.reflectX();
+  p = p.translate(new Point2D(0,120));
+
+  ctx.stroke(p);
+
+  // top right
+  cs = 12; // half thickness
+  let L = 150; // length
+
+  p = new FPath();
+  tan1 = 10;
+  tan2 = 10;
+  p.moveTo(cax,cay + cs);
+  p.bezierCurveTo(cax + tan1,cay + cs,
+    cax + L - tan2,cay +cs,
+    cax + L,cay + cs);
+
+  // lower right
+  tan1 = 6;
+  tan2 = 6;
+  p.bezierCurveTo(cax + L + tan1,cay +cs,
+    cax + L + cs,cay + tan2,
+    cax + L + cs,cay);
+
+  // upper right
+  p.bezierCurveTo(cax + L + cs,cay - tan1,
+    cax + L + tan2,cay - cs,
+    cax + L,cay - cs);
+
+  // top
+  p.bezierCurveTo(cax + L - tan1,cay - cs,
+    cax + tan2,cay - cs,
+    cax,cay - cs);
+
+  // upper left
+  p.bezierCurveTo(cax - tan1,cay - cs,
+    cax - cs,cay - tan2,
+    cax - cs,cay);
+
+  // lower left to close
+  p.bezierCurveTo(cax - cs,cay + tan1,
+    cax - tan2,cay + cs,
+    cax,cay + cs);
+
+  // Rotate the entire thing
+  let a = -12 * Math.PI / 180; // angle to rotate
+  let p2 = p.rotateAbout(a,new Point2D(cax,cay));
+  
+  ctx.lineWidth = 2.0;
+
+  p2 = p2.reflectX();
+  p2 = p2.translate(new Point2D(0,120));
+
+  ctx.stroke(p2);
+}
+\end{figput}
+\caption{Basic Constraints on Gears}
+\label{fig-basic-gear-constraints}
+\end{figure}
+
+See Figure (\ref{fig-basic-involute}). 
+Imagine a string wrapped around the circle, with one end fixed to the
+circle and a pencil at the other end. As the string unwraps from the
+circle, the pencil traces out a 
+curve called the involute. The line determined by the string is
+obviously tangent to the circle at the point at which it meets the circle. The
+line is also perpendicular to the involute because, at each
+instantaneous point of rotation, the involute is locally an arc of the
+circle formed by the string. For a circle of radius $r$ centered at the
+origin, the involute can be parameterized by $i(t)=(i_x(t),i_y(t))$, where
+\begin{eqnarray*}
+i_x(t) &=& r (\cos t + t \sin t) \\
+i_y(t) &=& r (\sin t - t \cos t)
+\end{eqnarray*}
+As we will see, the notable thing about the involute is that when gear
+teeth take the form of an involute, the pitch point is constant
+throughout the gears' motion. 
+
+\begin{figure}[b!]
+\begin{figput}{basicinvolute,140bp}[done,skip]
+// An extra function to define the involute.
+function invo(t) {
+  
+  // Basically, if you have a circle of radius a, the parametric form is
+  // x(t) = a (cos t + t sin t)
+  // y(t) = a (sin t - t cos t)
+  // The parameterization starts with t = 0, then runs as an angle in radians.
+
+  // These values copied from below.
+  let cx = 160;
+  let cy = 52;
+  let a = 50;
+
+  let c = Math.cos(t);
+  let s = Math.sin(t);
+
+  return new Point2D( cx + a*(c + t*s), cy + a*(s - t*c));  
+}
+
+function basicinvolute(ctx) {
+
+  // A looping animation that draws an involute. The string unwraps
+  // and re-wraps in a loop. Note the doubling of numSteps since I
+  // want back-and-forth action.
+  let numSteps = 100;
+  let loopw = LoopAnimWidget.register(ctx,-30,55,0.85,
+  true, // visible
+  2*numSteps, // steps per loop
+  0, // starting step
+  20, // ms time step
+  //false,false,false,false,false, // nothing is visible
+  true,true,true,true,true, // Everything visible
+  'loop');
+
+  let cx = 160;
+  let cy = 52;
+  let r = 50;
+
+  // circle
+  let p = new FPath();
+  p.ellipse(cx,cy,r,r,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // And a dot at the center.
+  p = new FPath();
+  p.ellipse(cx,cy,2,2,0,0,2*Math.PI);
+  ctx.fillStyle = 'black';
+  ctx.fill(p);
+
+  // Draw the involute by converting to a bezier.
+  // The level of ``unwrap'' is determined by the number of steps of
+  // the animation.
+  let t = 2 * Math.abs((loopw.curStep - numSteps) / numSteps);  
+  let segs = Math.ceil(15 * t);
+  p = FPath.parametricToBezier(invo,0,t,segs);
+  ctx.lineWidth = 1.2;
+  ctx.stroke(p);
+
+  // The string goes from the end of the involute to a point tangent
+  // to the circle. So, I have a circle centered at
+  // (c_x,c_y) and a point p = (p_x,p_y) = end-point of involute, and
+  // I want the point on the circle such that the line from the point on
+  // the circle to p is tangent to the circle. The circle is parameterized
+  // by (c_x,c_y) + r(cos a,sin a), (a varies) so the tangent to the circle is
+  // parameterized by r(-sin a,cos a). I need such a tangent vector that points
+  // to p. Let t(a) = r(-sin a,cos a) and c(a) = r(cos a,sin a). I need to
+  // find a such that c(a) + s t(s) = p, for some s. Thus, I need to solve
+  // (c_x + r cos a - s r sin a,c_y + r sin a + s r cos a) = (p_x,p_y)
+  // for a and s (although I don't really care about s). We have
+  // c_x + r cos a - s r sin a = p_x implies
+  // s = ( c_x + r cos a - p_x) / r sin a
+  // Plugging into the other coordinate, we get
+  // p_y = c_y + r sin a + s r cos a
+  // p_y = c_y + r sin a + r cos a ( c_x + r cos a - p_x) / r sin a
+  // p_y = c_y + r sin a + cos a ( c_x + r cos a - p_x) / sin a
+  //
+  // BLAH. That is a mess. Easier is to do it by construction.
+  // We have a circle centered at C and a point P. Let D be the midpoint
+  // of line line CP. The circle about D passing through C and P meets the
+  // circle around C at two points, E and F. The line from C to E (or to F)
+  // is a right angle since the angle is ``inscribed'' in the circle about D.
+  // This is a general fact, that if you take two points that are opposite
+  // each other in a circle (C and P in my example) and *any* other point
+  // on that circle, then the angle formed by the two opposite points and
+  // that other point is a right angle.
+  // If that is a right angle, then the line from P to E (or to F) is tangent
+  // to the circle.
+  //
+  // Moral of the story...We have circle centered at (c_x,c_y) and p=(p_x,p_y),
+  // the end-point of involute. The line from p tangent to the circle is
+  // obtained by defining d=(d_x,d_y) as the midpoint of c and p. The
+  // intersection of the circle around d with the circle around c is the
+  // point in question.
+  //
+  // I've reduced to the problem of finding the points of intersection of two
+  // circles. We have
+  // (x-c_x)^2 + (y-c_y)^2 = r_c^2
+  // (x-d_x)^2 + (y-d_y)^2 = r_d^2
+  // Subtract the second from the first to obtain
+  // (x-c_x)^2 - (x-d_x)^2 + (y-c_y)^2 - (y-d_y)^2 = r_c^2 - r_d^2
+  // Expand and collect:
+  // x^2-2xc_x+c_x^2 - x^2+2xd_x-d_x^2 + y^2-2yc_y+c_y^2 - y^2+2yd_y-d_y^2 =
+  //     r_c^2 - r_d^2
+  // -2xc_x+c_x^2 +2xd_x-d_x^2 - 2yc_y+c_y^2 +2yd_y-d_y^2 = r_c^2 - r_d^2
+  // 2x(d_x-c_x) + 2y(d_y-c_y) + c_x^2 -d_x^2 +c_y^2 -d_y^2 = r_c^2 - r_d^2
+  // 2x(d_x-c_x) + 2y(d_y-c_y) = (r_c^2-r_d^2) + (c_x^2-d_x^2) + (c_y^2 -d_y^2)
+  // Solve for y (say):
+  // y = x(c_x-d_x) / 2(d_y-c_y) +
+  //    [ (r_c^2-r_d^2) + (c_x^2-d_x^2) + (c_y^2 -d_y^2) ] / 2(d_y-c_y)
+  // and plug this back into the original equation for the circle and you
+  // can solve for x. First, write the above eqn for y as
+  // y = x(c_x-d_x) / D + r_m / D
+  //   = [ x(c_x-d_x) + r_m ] / D
+  // where r_m means ``r-mess'' and D is for ``denominator.''
+  // (x-c_x)^2 + (y-c_y)^2 = r_c^2
+  // (x-c_x)^2 + [ ( x(c_x-d_x)+ r_m ) / D - c_y ]^2 = r_c^2
+  // (x-c_x)^2 + ( x(c_x-d_x)+ r_m )^2 / D^2 - c_y ]^2 = r_c^2
+  // Etc. In theory, this is a quadratic in x, but wow.
+  //
+  // That is another mess. Back up a bit, and consider the general case
+  // of the intersection of two circles, c and d.
+  // Let D = distance between centers and P be the point of intersection.
+  // Draw a line between the centers and two triangles, one from center c to
+  // P and then perpendicular to the line betwene centers, and the other
+  // triangle similar, but in circle d. Let E be the point where the
+  // perpendicular leg of the triangles intersects the line between centers.
+  // We have distances a and b, a from center of C to E, and b from center
+  // of d to E. Let h be the height of this perpendicular leg. We have
+  // D = a + b, a^2 + h^2 = r_c^2 and b^2 + h^2 = r_d^2. Solve for a and b.
+  // This is really the same is the big messy thing, but easier to follow.
+  //
+  // FORGET ABOUT THE ABOVE. THIS IS THE WAY TO DO IT.
+  // Back way up to the very begining and reconsider the whole thing with
+  // simpler assuptions. Suppose that the circle is centered at the origin,
+  // so we can ignore (c_x,c_y). Assume also that the point is on the
+  // x-axis so that p = (p_x,p_y) = (p_x,0). Now the circle is
+  // C(a) = r (cos a, sin a)
+  // C'(a) = r (-sin a, cos a).
+  // We want the line through C(a) pointing in the C'(a) direction to
+  // pass through p. That is, we require a solution (in t and a) to
+  // C(a) + t C'(a) = p
+  // r cos a - r t sin a = p_x and r sin a + r t cos a = 0.
+  // So t = - sin a / cos a = - tan a. Then
+  // r cos a + r sin^2 a / cos a = p_x
+  // r cos^2a + r sin^2 a = p_x cos a
+  // r = p_x cos a
+  // THAT we can solve for a. We get this solution, but then have to shift
+  // and rotate. Rotate the entire plane by the angle that p is relative to
+  // the x-axis. Then shift to move the origin of the circle to (c_x,c_y).
+  //
+  // BUG: This entire mess belongs in some geometry module, preferably with
+  // a complete discussion of the math.
+
+  let P = invo(t);
+
+  // This is p_x in the analysis above.
+  let Pd = Math.sqrt((P.x - cx)**2 + (P.y - cy)**2);
+
+  // There are two possible solutions for r = p_x cos a or
+  let a = Math.acos(r/Pd);
+
+  // Now have a solution that's valid for P on the x-axis. Rotate (Pd,0) to P.
+  // This has the effect of rotating C(a) (with the a just determined this
+  // would be the tangent point if P were on the x-axis and C were centered
+  // at the origin) through an angle b, determined by tan b = P_x/P_y.
+  // But we want this relative to (cx,cy), so shift.
+  let b = Math.atan2(P.y-cy,P.x-cx);
+
+  // The point we want is now C(a+b), then translated by (cx,cy).
+  let E = new Point2D(r*Math.cos(a+b)+cx,r*Math.sin(a+b)+cy);
+  
+  p = new FPath();
+  p.moveTo(P.x,P.y);
+  p.lineTo(E.x,E.y);
+  ctx.lineWidth = 0.8;
+  ctx.stroke(p);
+
+}
+\end{figput}
+\caption{The Involute of a Circle}
+\label{fig-basic-involute}
+\end{figure}
+
+Figure (\ref{fig-constant-pp}) shows two disks acting as gears by
+simple friction. The circle of each such disk is 
+called the \emph{pitch circle} (where they come in contact is the
+pitch point). The centers of these disks are joined 
+by the \emph{line of centers}, and the distance between these centers
+is the \emph{center distance}. Now imagine two slightly smaller and
+concentric circles, called the \emph{base circles}. These base circles
+will be used to form involutes, and these involutes will be the
+profiles of the gear teeth.
+
+
+\begin{figure}
+\begin{figput}{constpp,140bp}[done,skip]
+function constpp(ctx) {
+
+  // A static figure, no interaction.
+  let rc = 60;
+  let rd = 40;
+  let y = 70;
+  
+  let c = new Point2D(100,y);
+  let d = new Point2D(c.x + rc+rd,y);
+
+  // Pitch circles
+  let p = new FPath();
+  p.ellipse(c.x,c.y,rc,rc,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 1.5;
+  ctx.stroke(p);
+
+  p = new FPath();
+  p.ellipse(d.x,d.y,rd,rd,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 1.5;
+  ctx.stroke(p);
+
+  // Base circles
+  let s = 0.80;
+  p = new FPath();
+  p.ellipse(c.x,c.y,s*rc,s*rc,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  p = new FPath();
+  p.ellipse(d.x,d.y,s*rd,s*rd,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  ctx.font = '10px san-serif';
+  ctx.fillStyle = 'black';
+  
+  drawText(ctx,'base circle', c.x,c.y,-4,0);
+  drawText(ctx,'pitch circle', d.x,c.y+rd+6,0,0);
+}
+\end{figput}
+\caption{Base Circle and Pitch Circle}
+\label{fig-constant-pp}
+\end{figure}
+
+
+\begin{figure}[b!]
+\begin{figput}{moveinvo,200bp}[done,skip]
+// At one point, I was making a small manual adjustment on the figure
+// placement here. I did this by wrapping all the drawing
+// (after the \useasbounding box) with
+// \begin{scope}[shift={(40bp,0bp)}]
+// then \end{scope} just before \end{tikzpicture}
+  
+function moveinvo(ctx) {
+
+  // Similar to above, but don't draw the pitch circles, and only a part
+  // of the base circles is drawn, and they're larger. There is also
+  // a line for the line of action and an animation to show what the
+  // point of contact does over time. OK, so not that similar!
+
+  let numSteps = 1000;
+  let loopw = LoopAnimWidget.register(ctx,-80,100,1.0,
+    true, // not hidden
+    numSteps, // steps per loop
+    0, // starting step
+    10, // ms time step
+    true,true,true,true,true,
+    'loop');
+
+  let rc = 80;
+  let rd = 60;
+  let y = 100;
+  let s = 35;
+  
+  let c = new Point2D(90,y);
+  let d = new Point2D(c.x + rc+rd +s,y);
+
+  // Base circles
+  p = new FPath();
+
+  // I played around, trying to show only portions of the disks so as to
+  // save space, but it doesn't look right. In some ways, that
+  // simplifies things.
+  p.ellipse(c.x,c.y,rc,rc,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 1.0;
+  ctx.stroke(p);
+  
+  p = new FPath();
+  p.ellipse(d.x,d.y,rd,rd,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 1.0;
+  ctx.stroke(p);
+
+  /* I was going to just draw these arcs, but better to do the
+  // whole cirles.
+  //In fact, defer drawing this. I want the entire wedge to turn.
+  // This arc is centered at (0,0).
+  let cVisAngle = 4*Math.PI/8;
+  p = FPath.arcToBezierNEW(rc,-cVisAngle,cVisAngle);
+  p = p.translate(c);
+  ctx.lineWidth = 2.0;
+  ctx.stroke(p);
+  
+  let dVisAngle = 5*Math.PI/8;
+  p = FPath.arcToBezierNEW(rd,dVisAngle,-dVisAngle);
+  p = p.translate(d);
+  ctx.lineWidth = 2.0;
+  ctx.stroke(p);
+  */
+
+  // The line of action.
+  // This involves another calculation of tangent lines. See Graphics Gems I,
+  // p. 7 and Figure 8. Use similar triangles. We have two distances,
+  // x_c and x_d from the respective centers of the circles to the point
+  // where the desired line intersects the line connecting the centers.
+  // We have x_c + x_d = D = distance between centers, and by
+  // similar triangles r_c/x_c = r_d/x_d. A little algebra gives
+  // x_c = r_c D / (r_c + r_d).
+  //
+  // We now have one point that must be on the line, and we go through the
+  // same rigmarole as above to find the line tangent to a circle. The only
+  // difference is that we've chosen the point through which the circle must
+  // pass in such a way that the resulting line will be tangent to both
+  // circles if it's tangent to either of them.
+  //
+  // As above, make the simplifying assumption that circle C is centered
+  // at the origin. Then do a rotate and translate at the end.
+  let D = Math.sqrt((c.x-d.x)**2 + (c.y-d.y)**2);
+  let xc = rc * D / (rc + rd);
+
+  // We are working (for now) as though circle C is centered at the origin.
+  // So this is the point we want.
+  let M = new Point2D(xc,0);
+
+  // As in the earlier case, where I did the involute, we get the tangent.
+  // The difference is that the point is now M, not P, as it was above.
+  let Md = Math.sqrt((M.x - c.x)**2 + (M.y - c.y)**2);
+  let a = Math.acos(rc/Md);
+  let b = Math.atan2(M.y,M.x);
+  let E = new Point2D(rc*Math.cos(-a+b)+c.x,rc*Math.sin(-a+b)+c.y);
+  
+  // The above draws from circle C to the central point M, but I need to
+  // extend the line all the way to the other circle. So I need to know where
+  // this line intersects that circle. Recall that M was found by similar
+  // triangles. The angle of the tangent point relative to the circles' centers
+  // is the same in both cases, although for the circle on the right, we
+  // have to adjust by pi.
+  b += Math.PI;
+  let F = new Point2D(rd*Math.cos(-a+b)+d.x,rd*Math.sin(-a+b)+d.y);
+
+  p = new FPath();
+  p.moveTo(E.x,E.y);
+  p.lineTo(F.x,F.y);
+  ctx.lineWidth = 0.6;
+  ctx.stroke(p);
+  
+  // The above draws the more or less static setup. Now I want to draw a
+  // particular point on the line of action, and let it move as the disks
+  // rotate, tracing out a pair of involutes.
+  //
+  // Use M for the particular point along the line, which is detemined
+  // by t, using a linear parameterization of the line E to F.
+  // This value is what determines the frame of the animation.
+  let t;
+  if (loopw.curStep < numSteps/2)
+    t = 2* loopw.curStep/numSteps;
+  else
+    t = 2 *(numSteps - loopw.curStep)/numSteps;
+  
+  M = new Point2D(E.x + t*(F.x-E.x),E.y + t*(F.y-E.y));
+
+  p = new FPath();
+  p.ellipse(M.x,M.y,1.5,1.5,0,0,2*Math.PI);
+  ctx.fillStyle = 'black';
+  ctx.fill(p);
+
+  // I need to know the total size of the tooth. So I need the value for
+  // t at which the tooth will barely clear the opposing gear. The value
+  // I am looking for has nothing to do with the current point of contact,
+  // and is always the same (which is sort of the point). Scale down the
+  // entire picture and find t for which the distance of involute(t) from
+  // the center of the left disk is equal to the distance between the
+  // edges of the two disks.
+  //
+  // BUG: A common problem is that lines have thickness. If you want line A
+  // to barely touch line B, then thicknesses matter. The strictly correct way
+  // to deal with this is probably to treat lines as filled rectangles (or
+  // quadrilaterals more generally). This general philisophy is one way to
+  // handle stuff like arrowheads. Another way might be to allow stroking
+  // the line on one side of its geometric definition or the other.
+  // I may have mentioned this issue before.
+  // 
+  // See above. rc and rd are the two disks' radii and the centers at c and d.
+  // The distance we care about is d.x-c.x-rd before scaling. Subtract off
+  // a hair to take into account line thicknesses. Scaling then gives:
+  let toothD = (d.x-c.x-rd - 2) / rc;
+
+  // And the value that brings the unit involute out to this distance.
+  let toothT = Numerical.newton(solveToothD,0.5,0,3,toothD,0.00001);
+
+  // For circle C, we have an involute extending out to M.
+  // The standard parameterization of the involute assumes that the point
+  // starts at the x-axis, and that is not true here. The ``point of initial
+  // contact'' with the base circle varies, and that is sort of the point
+  // for gear design. At any rate, the usual parameterization is
+  // x(a) = r (cos a + a sin a)
+  // y(a) = r (sin a - t cos a)
+  // What we need to do is to add some constant to a so as to shift
+  // the involute -- effectively rotate it around the center of the circle.
+  //
+  // The distance from M to E is how much string wraps around the circle C.
+  // This determines the point of initial contact. Let d_M = |M-E|.
+  // When wrapped around the circle, this corresponds to an angle d_M/r_c. 
+  // It wraps from the point E, and that point is at angle -a+b relative to
+  // the x-axis. So the adjustment we need to make is a_M = d_M/r_c +a-b.
+  // There's also a pi adjustment due to LH coordinates.
+  //
+  // In addition, we need to know at what value of a (as argument to the
+  // parameterization) the involute reaches M. THAT is not so easy since it
+  // amounts to inverting the involute. We want to find t such that
+  // involute(t) = M, where M is the point in question. Assuming that (u,v)
+  // is on the involute, and considering the ``standard'' involute, what
+  // we want is t such that
+  // u = cos t + t sin t
+  // v = sin t - t cos t
+  // I don't think there's any good way to do this, and a bit of googling
+  // bears that out. I'm not going to try to be mathematically clever.
+  // Just use Newton's method. So, take the point, M, and "undo" the
+  // transformation to get M relative to the standard involute -- I mean for
+  // a unit circle at the origin.
+  let dM = Math.sqrt((M.x-E.x)**2 + (M.y-E.y)**2);
+  let aM = dM/rc - a + b - Math.PI;
+
+  // Untranslate, unscale and unrotate M.
+  // BUG: This foolishness is why I should have worked with the standard unit
+  // involute throughout. 
+  let unitM = new Point2D(M.x - c.x,M.y-c.y);
+  unitM = new Point2D(unitM.x/rc,unitM.y/rc);
+  unitM.rotateSelf(-aM);
+
+  // Now I want t such that invo2(t).x = unitM.x. I'm using x instead of
+  // y since y varies very little near the circle and I'm afraid that
+  // the root finder won't converge well.
+  // Note that t = 3 is roughly where the derivative changes sign.
+  // That's why it's a good place for bracketing.
+  t = Numerical.newton(solveInvo,0.5,0,3,unitM.x,0.00001);
+
+  // However, we do NOT want to use a value for t larger than toothT
+  // since the tooth would make the tooth magically grow to touch M.
+  if (t > toothT) t = toothT;
+  
+  p = FPath.parametricToBezier(invo2,0,t,30);
+  p = p.rotate(aM);
+  p = p.scale(rc);
+  p = p.translate(c);
+
+  ctx.lineWidth = 1.0;
+  ctx.stroke(p);
+
+  // Now, exactly as above, draw a bit of the involute.
+  p = FPath.parametricToBezier(invo2,t,toothT,30);
+  p = p.rotate(aM);
+  p = p.scale(rc);
+  p = p.translate(c);
+  
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+  
+  // And...what the heck... some spokes to make the rotation
+  // more noticable.
+  p = new FPath();
+  p.moveTo(c.x,c.y);
+  let sp = new Point2D(c.x+rc,c.y);
+  sp = sp.rotateAbout(c,aM);
+  p.lineTo(sp.x,sp.y);
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // let wedgeRange = cVisAngle / 4;
+  let wedgeRange = Math.PI / 6;
+  for (let i = 0; i < 10; i++)
+    {
+      let a = aM + i*wedgeRange;
+      //if ((a <= cVisAngle) && (a >= -cVisAngle))
+        {
+          p = new FPath();
+          p.moveTo(c.x,c.y);
+          let sp = new Point2D(c.x+rc,c.y);
+          sp = sp.rotateAbout(c,a);
+          p.lineTo(sp.x,sp.y);
+          ctx.lineWidth = 0.4;
+          ctx.stroke(p);
+        }
+
+      a = aM - i*wedgeRange;
+      //if ((a <= cVisAngle) && (a >= -cVisAngle))
+        {
+          p = new FPath();
+          p.moveTo(c.x,c.y);
+          let sp = new Point2D(c.x+rc,c.y);
+          sp = sp.rotateAbout(c,a);
+          p.lineTo(sp.x,sp.y);
+          ctx.lineWidth = 0.4;
+          ctx.stroke(p);
+        }
+    }
+
+  // Now we have to do almost the same thing, but for the right disk.
+  // The twist is that the involute is now flipped relative to the
+  // earlier case because the right disk rotates in the opposite direction.
+  // That is, swap the sign of the y-coordinate, and the x-coordinate too
+  // since the disk is on the right.
+  //
+  // The tooth height is the same on the right side, but the scale is different,
+  // so the value of toothT will be different.
+  toothD = (d.x-c.x-rc - 2) / rd;
+  toothT = Numerical.newton(solveToothD,0.5,0,3,toothD,0.00001);
+  
+  // What we want is for the flipped involute to pass through M, although
+  // it will pass through M at a different value for t. I could work out
+  // this t by finding it numerically. Or, I could use the fact that --
+  // because I know how gears work -- the relative rates of rotion are known.
+  // In fact, because I want the line to change at M, I do need this value
+  // for t. This is more like what happens physically: the motion of the
+  // left disk determines M, which pushes the disk on the right to rotate.
+  //
+  // Redetermine unitM, as above, but relative to the right disk.
+  // Do it afresh to avoid any rounding error.
+  dM = Math.sqrt((M.x-F.x)**2 + (M.y-F.y)**2);
+  aM = dM/rd - a + b - Math.PI;
+  unitM = new Point2D(d.x-M.x ,d.y-M.y);
+  unitM = new Point2D(unitM.x/rd,unitM.y/rd);
+  unitM.rotateSelf(-aM);
+
+  // This is the value for t at which the RH involute passes through M.
+  t = Numerical.newton(solveInvo,0.5,0,3,unitM.x,0.00001);
+  if (t > toothT) t = toothT;
+
+  // Path from disk to M
+  p = FPath.parametricToBezier(invo2,0,t,30);
+  p = p.reflectXY();
+  p = p.rotate(aM);
+  p = p.scale(rd);
+  p = p.translate(d);
+  
+  ctx.lineWidth = 1.0;
+  ctx.stroke(p);
+
+  // Path from M to the tip of the tooth.
+  p = FPath.parametricToBezier(invo2,t,toothT,30);
+  p = p.reflectXY();
+  p = p.rotate(aM);
+  p = p.scale(rd);
+  p = p.translate(d);
+  
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // And some spokes for visual appeal, as above.
+  // The outer arc first.
+  /*
+  dVisAngle = 5*Math.PI/8;
+  p = FPath.arcToBezier(rd,dVisAngle,-dVisAngle);
+  p = p.rotate(aM);
+  p = p.translate(d);
+  ctx.lineWidth = 2.0;
+  ctx.stroke(p);
+  */
+  
+  // And the spokes.
+  p = new FPath();
+  p.moveTo(d.x,d.y);
+  sp = new Point2D(d.x-rd,d.y);
+  sp = sp.rotateAbout(d,aM);
+  p.lineTo(sp.x,sp.y);
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // In fact, the angle *spanned* by the arc is two times this.
+  // It's because of the whole LH/RH thing.
+  for (let i = 0; i < 7; i++)
+    {
+      let a = aM + i*wedgeRange;
+      //if ((a <= dVisAngle) && (a >= -dVisAngle))
+        {
+          p = new FPath();
+          p.moveTo(d.x,d.y);
+          let sp = new Point2D(d.x-rd,d.y);
+          sp = sp.rotateAbout(d,a);
+          //sp.x = d.x - (sp.x - d.x);
+          p.lineTo(sp.x,sp.y);
+          ctx.lineWidth = 0.4;
+          ctx.stroke(p);
+        }
+
+      a = aM - i*wedgeRange;
+      p = new FPath();
+      p.moveTo(d.x,d.y);
+      let sp = new Point2D(d.x-rd,d.y);
+      sp = sp.rotateAbout(d,a);
+      p.lineTo(sp.x,sp.y);
+      ctx.lineWidth = 0.4;
+      ctx.stroke(p);
+    }
+}
+
+function solveToothD(t) {
+  let p = invo2(t);
+  return Math.sqrt(p.x**2 + p.y**2);
+}
+
+function solveInvo(t) {
+  return invo2(t).x;
+}
+
+function invo2(t) {
+
+  // Involute, assuming circle of radius 1 centered at the origin.
+  // There is another function called invo(), hence this is invo2().
+  // BUG: This is the way I should have done this above. Generate a standard
+  // involute, then scale and rotate as needed.
+  let c = Math.cos(t);
+  let s = Math.sin(t);
+
+  // Note that y is backwards since LH coordinate system.
+  return new Point2D( c + t*s , - (s - t*c) );
+}
+\end{figput}
+\caption{Rotation Traces Involutes}
+\label{fig-moving-involute}
+\end{figure}
+
+
+Figure (\ref{fig-moving-involute}) shows an enlarged view of the two
+base circles of Figure (\ref{fig-constant-pp}), without the pitch
+circles. Imagine that a piece of string is tightly
+wrapped around one base circle, extends over to the other base circle,
+and is wrapped around it too. As the disks rotate, the string unwinds
+from one base circle and is taken up by the other base circle. There
+is a fixed point on the string that represents the point of
+contact between two teeth. This point traces a path that
+is an involute relative to either circle. These involutes define the
+shape of the mating tooth profiles. The line of action is coincident
+with the string, and the two gears have conjugate action.
+
+A fortunate feature of the involute is that the teeth can be truncated at
+their perimeter, or their widths may be varied, yet the two gears
+still have conjugate action; the teeth come into contact sooner or
+later as they rotate, but the point of contact follows the same line
+of action. If the center distance changes, then the line of action
+also changes, but the tooth form (the involute) remains the same, and
+the gears still have conjugate action, though there will be some
+backlash and additional friction between the teeth.
+
+What remains is the resolution of many practical issues: the interplay
+of gear radius, tooth size, number of teeth and the
+like.
+
+The two main methods of gear specification are
+metric (ISO) and inch (AGMA), and the two systems use slightly different
+fundamental quantities to specify a given gear. These are the basic
+parameters used to specify off-the-shelf gear profiles.
+\begin{small}
+\begin{itemize}[itemsep=-1pt]
+\item $\phi$, pressure angle
+\item $N$, number of teeth
+\item $m$, module (for metric gears)
+\item $p_d$, diametral pitch (for inch gears)
+\end{itemize}
+\end{small}
+
+There are many additional terms and measurements. In fact,
+off-the-shelf gears are typically specified in a way that makes
+various assumptions. Additional parameters that influence 
+gear design are 
+\begin{small}
+\begin{itemize}[itemsep=-1pt]
+\item $p_c$, circular pitch
+\item $d$, pitch diameter
+\item $r_p$, pitch radius
+\item $r_b$, base radius
+\item $a$, addendum
+\item $b$, dedendum
+%\item $C$, center distance
+%\item $r$, pitch radius
+\end{itemize}
+\end{small}
+
+The \emph{pressure angle}, $\phi$, is the angle between the line of
+action and the perpendicular to the line of centers. In Figure
+(\ref{fig-moving-involute}), the pressure angle is roughly $35^\circ$.
+If two gears are to mesh without backlash, then they must use the same
+pressure angle. At one time, $14.5^\circ$ was a commonly used pressure
+angle, but $20^\circ$ is the current standard.
+A more obviously important choice is the number of teeth, $N$. Since
+the number of teeth determines the ratio of any gear train, this is a crucial
+choice, but it raises the question of how to fit $N$ teeth on a given
+gear.
+
+The tooth-to-tooth distance, as measured along the arc of the pitch
+circle, is the \emph{circular pitch}, $p_c$, and the corresponding
+diameter is the \emph{pitch diameter}, $d$. Since $N p_c$ is the
+circumference of the pitch circle, we have
+$$p_c = {\pi d\over N}.$$
+This is the inches or mm per tooth, measured along the circumerence. In
+practice, AGMA gears are specified by the \emph{diametral pitch}, 
+$$p_d = {N\over d}.$$
+This is the teeth per $\pi$ inches, and seems like an odd
+choice, but that's how it's done.
+Metric gears are specified by their \emph{module}, $m$, which is
+stated in millimeters, and is
+$$m = {d\over N} = {1\over p_d}.$$
+The actual tooth-to-tooth distance is thus $\pi m$. 
+The values around which the two systems, ISO and AGMA,
+are standardized are not compatible. For example, a module of $m=4$
+corresponds to a diametral pitch of
+$$p_d = {25.4\over 4} = 6.35,$$
+which is not a standard AGMA size.
+
+The profile of each gear tooth is an involute, and determining the
+involute requires that the base circle be known. See Figure
+(\ref{fig-base-from-pitch}), in which the outer circle is the pitch circle and
+the inner circle is the base circle. Let $r_p$ be the radius of the
+pitch circle, and $r_b$ be the radius of the base circle. Because the
+angle determined by where the line of action meets the base circle is
+equal to the pressure angle, $\phi$, we have
+$$r_b = r_p \cos\phi.$$
+
+\begin{figure}[b!]
+\begin{figput}{baseandpitch,175bp}[done,skip]
+function baseandpitch(ctx) {
+
+  // A static figure, no interaction.
+  let rc = 70;
+  let y = 80;
+
+  let c = new Point2D(130,y);
+
+  // Pitch circle
+  let p = new FPath();
+  p.ellipse(c.x,c.y,rc,rc,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // Radius through pitch point
+  let pplen = rc + 50;
+  p = new FPath();
+  p.moveTo(c.x,c.y);
+  p.lineTo(c.x+pplen,c.y);
+  ctx.stroke(p);
+  
+  // Line of action through P and angle phi. Use tan phi = dx / dy
+  // to draw a line through P = (c.x+rc,c.y).
+  let phi = Math.PI / 6;
+  let lenup = 70;
+  let lendown = 50;
+  let tan = Math.tan(phi);
+  p = new FPath();
+  p.moveTo(c.x + rc - lenup * tan,c.y + lenup);
+  p.lineTo(c.x + rc + lendown * tan,c.y - lendown);
+  ctx.stroke(p);
+  
+  // Base circle has radius:
+  let rb = rc * Math.cos(phi);
+  p = new FPath();
+  p.ellipse(c.x,c.y,rb,rb,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // Vertical line through P.
+  let vlen = 60;
+  p = new FPath();
+  p.moveTo(c.x+rc,c.y-vlen);
+  p.lineTo(c.x+rc,c.y+vlen);
+  ctx.stroke(p);
+
+  // radial line to where line of action meets base circle.
+  p = new FPath();
+  p.moveTo(c.x,c.y);
+  p.lineTo(c.x + rb*Math.cos(phi),c.y+rb*Math.sin(phi));
+  ctx.stroke(p);
+
+  // Little hash marks to indicate angles have same measure.
+  p = FPath.circArcToBezier(16,0,phi);
+  p = p.translate(c);
+  ctx.stroke(p);
+  
+  p = FPath.circArcToBezier(16,Math.PI/2 - phi,Math.PI/2);
+  p = p.reflectX();
+  p = p.translate(new Point2D(c.x+rc,c.y));
+  ctx.stroke(p);
+}
+
+\end{figput}
+\caption{Base Circle from Pitch Circle}
+\label{fig-base-from-pitch}
+\end{figure}
+
+
+The module or diametral pitch determines the tooth-to-tooth distance,
+but it doesn't determine how much of that space is solid tooth and how
+much is the space between teeth. The ensure that there is no backlash,
+the thickness of each tooth, as measured along the arc of the pitch
+circle, should be equal to the space between teeth -- for practical
+reasons (lubrication), the gap between teeth is often made one or two 
+thousandths of an inch wider than this. Again, these distances are
+\emph{as measured along the arc of the pitch circle}. In practice, it
+is easier to work with the angles subtended by these arcs.
+
+There is one further issue to resolve. See Figure (\ref{fig-teeth-touch}),
+which shows a portion of a base circle and slightly larger pitch
+circle, with an involute. What's needed is the measure of the small
+angle relative to the $x$-axis at which the involute meets the pitch
+circle. The involute is parametrized by 
+$$i(t) = r_b(\cos t + t\sin t,\sin t - t\cos t) = (i_x(t),i_y(t)),$$
+and the involute meets the pitch circle when $|i(t)|^2 = r_p^2$. We have
+\begin{eqnarray*}
+|i(t)|^2 &=& r_b^2\left[(\cos t + t\sin t)^2 + (\sin t - t\cos t)^2\right] \\
+&=& r_b^2\left[\cos^2 t + 2t\cos t\sin t + t^2\sin^2t + 
+  \sin^2 t - 2t\cos t\sin t + t^2\cos^2 t\right] \\
+&=& r_b^2(1 + t^2),
+\end{eqnarray*}
+and $|i(t)| = r_p$ implies that
+$$t = \sqrt{\left({r_p\over r_b}\right)^2-1} = \sqrt{\left({r_p\over
+    r_p\cos\phi}\right)^2-1}\  = \tan\phi.$$
+The angle made by the line through $i(t)$ with the $x$-axis is
+$\alpha$, where\footnote{There
+  seems to be no standard notation for this angle. In fact, I have
+  found no mention of this issue in any common reference, even though it's crucial for
+  determining the profile.} 
+$$\tan\alpha = i_y(t)/i_x(t).$$
+
+\begin{figure}
+\begin{figput}{teethtouch,100bp}[done,skip]
+function teethtouch(ctx) {
+
+  let c = new Point2D(100,20);
+  let rb = 80;
+
+  // Bit of arc on the right. This is the base circle.
+  let span = Math.PI/5;
+  let p = FPath.circArcToBezier(rb,0,span);
+  //p = p.reflectX();
+  p = p.translate(c);
+  ctx.lineWidth = 1.0;
+  ctx.stroke(p);
+
+  // And a slightly larger arc for the pitch circle.
+  let rp = rb + 22;
+  p = FPath.circArcToBezier(rp,0,span);
+  //p = p.reflectX();
+  p = p.translate(c);
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+    
+  // Draw x-axis/radius.
+  let width = 150
+  p = new FPath();
+  p.moveTo(c.x,c.y);
+  p.lineTo(c.x+width,c.y);
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+  
+  // Using the earlier invo2() function for the unit involute.
+  let a = Math.PI/8;
+  let inv = FPath.parametricToBezier(invo2,0,1.5,30);
+  p = inv.reflectX();
+  //p = inv.scale(rb);
+  p = p.scale(rb);
+  p = p.translate(c);
+  ctx.stroke(p);
+
+  // And a line out to the point where the top involute meets the pitch circle.
+  p = new FPath();
+  p.moveTo(c.x,c.y);
+  let t = Math.sqrt((rp/rb)**2 - 1);
+  let q = invo2(t);
+  q = new Point2D(q.x,-q.y);
+  q = new Point2D(q.x*rb,q.y*rb);
+  q = new Point2D(q.x+c.x,q.y+c.y);
+  p.lineTo(q.x,q.y);
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+}
+\end{figput}
+\caption{Angle Subtended by Involutes.}
+\label{fig-teeth-touch}
+\end{figure}
+
+We now have enough information to begin laying out gear
+profiles. Suppose that $\phi$, $N$ and $m$ (or $p_d$) are given. There
+will be $N$ involutes runing one way, and $N$ running the other
+way. Relative to the base circle, the tooth-to-tooth distance subtends
+an angle measuring $2\pi/N$. Half of this is solid tooth, and half is the
+gap between teeth, with an adjustment for $\alpha$. So each solid
+tooth subtends the angle $\pi/N + 2\alpha$, and each gap
+subtends the angle $\pi/N - 2\alpha$. Figure~(\ref{fig-gear-example})
+shows the result for $\phi = 20^\circ$, $N=15$ and $m =4$. 
+
+\begin{figure}
+\begin{figput}{gearexample,120bp}[done,skip]
+function gearexample(ctx) {
+
+  // Note that I may have written this for a LH coordinate system, but
+  // it doesn't matter since it's radially symmetric.
+  
+  // Pressure angle, number of teeth and module.
+  let phi = 20 * Math.PI / 180;
+  let N = 15;
+  let m = 5;
+
+  let c = new Point2D(175,60);
+  let pitchDiam = N * m;
+
+  // Pitch radius and base radius.
+  let rp = pitchDiam / 2;
+  let rb = rp * Math.cos(phi);
+
+  ctx.lineWidth = 0.4;
+
+  // Point along parameterization where involute meets pitch circle.
+  let t = Math.tan(phi);
+
+  // Adjustment to width of the base of the teeth due to the fact that
+  // the teeth are of varying width. Note that the radius of the base circle
+  // doesn't matter.
+  let ipt = invo2(t);
+  let alpha = -Math.atan2(ipt.y,ipt.x);
+
+  ctx.lineWidth = 0.4;
+
+  // Each tooth, at the base, takes 2pi/2N + 2 alpha. The space between
+  // teeth is 2pi/2N - 2 alpha
+  //
+  // We want the x-axis to split a gap between teeth, so the first tooth
+  // starts at (pi/N - 2 alpha) / 2 = pi/2N - alpha.
+  //
+  // Using earlier function for the unit involute.
+  // Note that the angles are all backwards (reversed sign) due to LH coords.
+  
+  let basicInv = FPath.parametricToBezier(invo2,0,1,30);
+  let basicArc = FPath.circArcToBezier(rb,0,Math.PI/N - 2*alpha);
+  basicArc = basicArc.reflectX();
+
+  let angle = -Math.PI / (2*N) + alpha;
+  ctx.strokeStyle='black';
+
+  for (let i = 0; i < N; i++)
+    {
+      // One side of tooth.
+      let inv = basicInv.rotate(angle);
+      inv = inv.scale(rb);
+      inv = inv.translate(c);
+      ctx.stroke(inv);
+
+      // Other side of tooth.
+      angle -= Math.PI / N + 2 * alpha;
+      inv = basicInv.reflectX();
+      inv = inv.rotate(angle);
+      inv = inv.scale(rb);
+      inv = inv.translate(c);
+      ctx.stroke(inv);
+
+      // Gap between teeth.
+      let gap = basicArc.rotate(angle);
+      gap = gap.translate(c);
+      //ctx.strokeStyle='blue';
+      ctx.stroke(gap);
+
+      angle -= Math.PI / N - 2*alpha;
+    }    
+}
+
+\end{figput}
+\caption{Basic Gear Form.}
+\label{fig-gear-example}
+\end{figure}
+
+There is a glaring problem with Figure (\ref{fig-gear-example}): the
+involutes continue beyond the point where the two sides of each tooth
+meet. If the aim is to program a milling machine to cut these profiles,
+then that's not a big deal -- the machine will be cutting a bit of
+air beyond the end of each tooth -- but it would be nice to know
+exactly where the two sides meet. Suppose that a tooth is symmetric
+about the $x$-axis so that the two sides meet at $y=0$. Let $R_\theta$
+be the rotation matrix through angle $\theta$. Then the involute below
+the $x$-axis is parameterized by $R_{-\theta}i(t)$, where $\theta
+= \alpha + \pi/2N$. In particular, we want to find $t$ such that the
+$y$-coordinate of $R_{-\theta}i(t)$ is equal to zero. We have
+\begin{eqnarray*}
+R_{-\theta}\ i(t) &=& \pmatrix{\cos\theta&\sin\theta\cr-\sin\theta&\cos\theta}
+\pmatrix{r_b(\cos t + t\sin t)\cr r_b(\sin t - t\cos t)},
+\end{eqnarray*}
+and we require $t$ such that
+$$-r_b\sin\theta(\cos t + t\sin t) + r_b\cos\theta(\sin t - t\cos t) = 0$$
+or
+$${\sin t - t\cos t\over \cos t + t\sin t} = \tan\theta.$$
+Unfortunately, finding such $t$ requires the use of numerical methods
+of approximation. Making use of something like Newton-Raphson to
+determine $t$, we obtain Figure (\ref{fig-gear-ex-better}).
+
+\begin{figure}
+\begin{figput}{bettergear,120bp}[done,skip]
+function bettergear(ctx) {
+
+  // As above, but the teeth meet properly instead of having ``hair.''
+  
+  // Pressure angle, number of teeth and module.
+  let phi = 20 * Math.PI / 180;
+  let N = 15;
+  let m = 5;
+
+  let c = new Point2D(175,60);
+  let pitchDiam = N * m;
+
+  // Pitch radius and base radius.
+  let rp = pitchDiam / 2;
+  let rb = rp * Math.cos(phi);
+
+  ctx.lineWidth = 0.4;
+  
+  // Point along parameterization where involute meets pitch circle.
+  let t = Math.tan(phi);
+
+  // Adjustment to width of the base of the teeth due to the fact that
+  // the teeth are of varying width. Note that the radius of the base circle
+  // doesn't matter.
+  let ipt = invo2(t);
+  let alpha = -Math.atan2(ipt.y,ipt.x);
+
+  ctx.lineWidth = 0.4;
+
+  // Each tooth, at the base, takes 2pi/2N + 2 alpha. The space between
+  // teeth is 2pi/2N - 2 alpha
+  //
+  // We want the x-axis to split a gap between teeth, so the first tooth
+  // starts at (pi/N - 2 alpha) / 2 = pi/2N - alpha.
+  //
+  // Using earlier function for the unit involute.
+  // Note that the angles are all backwards (reversed sign) due to LH coords.
+  //
+  // We also solve for t so that the teeth meet as they should.
+  let targetV = Math.tan(Math.PI/(2*N) + alpha);
+  let toothT = Numerical.newton(toothMeet,0.3,0,2,targetV,0.00001);
+  
+  let basicInv = FPath.parametricToBezier(invo2,0,toothT,30);
+  let basicArc = FPath.circArcToBezier(rb,0,Math.PI/N - 2*alpha);
+  basicArc = basicArc.reflectX();
+
+  let angle = -Math.PI / (2*N) + alpha;
+  ctx.strokeStyle='black';
+
+  for (let i = 0; i < N; i++)
+    {
+      // One side of tooth.
+      let inv = basicInv.rotate(angle);
+      inv = inv.scale(rb);
+      inv = inv.translate(c);
+      ctx.stroke(inv);
+
+      // Other side of tooth.
+      angle -= Math.PI / N + 2 * alpha;
+      inv = basicInv.reflectX();
+      inv = inv.rotate(angle);
+      inv = inv.scale(rb);
+      inv = inv.translate(c);
+      ctx.stroke(inv);
+
+      // Gap between teeth.
+      let gap = basicArc.rotate(angle);
+      gap = gap.translate(c);
+      //ctx.strokeStyle='blue';
+      ctx.stroke(gap);
+
+      angle -= Math.PI / N - 2*alpha;
+    }
+}
+
+function toothMeet(t) {
+
+  // Used to solve for the t at which the two sides of a tooth meet.
+  let s = Math.sin(t);
+  let c = Math.cos(t);
+  return (s - t*c) / (c + t * s);
+}
+
+\end{figput}
+\caption{Corrected Gear Form.}
+\label{fig-gear-ex-better}
+\end{figure}
+
+Figure (\ref{fig-gear-ex-better}) still doesn't look quite
+right. Gears don't typically have such pointy-ended teeth, and the gaps
+between the teeth don't seem deep enough in Figure
+(\ref{fig-gear-ex-better}). There are two more parameters to adjust
+for this: the \emph{addendum}, $a$, and \emph{dedendum}, $b$. The
+addendum is the distance above the pitch circle to which the teeth
+extend; when a tooth reaches a radius of $r_p + a$, it is truncated
+and given a flat top (the so-called \emph{top land}). The dedendum is
+the depth below the pitch circle to which the gap between teeth is
+cut; so the gaps are cut to a radius of $r_p -b$ (forming the
+so-called \emph{bottom land}). While the parameters $a$ and $b$ could
+take any value, they have been standardized to
+$$a = m\qquad{\rm and}\qquad b = 1.25\ m.$$
+Under the AGMA system (inches), these are
+$$a = 1/p_d\qquad{\rm and}\qquad b = 1.25/p_d.$$
+Teeth have been standardized this way because the tips of pointy-ended
+teeth are prone to burring, while cutting the gaps more deeply allows
+for fuller engagement of the teeth. Figure (\ref{fig-gear-with-add-ded})
+shows the same gear as in Figure (\ref{fig-gear-ex-better}), but with
+the addendum and dedendum circles.
+
+\begin{figure}[b!]
+\begin{figput}{gearaddded,120bp}[done,skip]
+function gearaddded(ctx) {
+
+  // As above, but with (or without when interactive) the various circles.
+  
+  // A button for show/hide the extra circles.
+  let wbut = ButtonWidget.register(ctx,-80,10,'Show/Hide','but');
+  
+  // Pressure angle, number of teeth and module.
+  let phi = 20 * Math.PI / 180;
+  let N = 15;
+  let m = 5;
+
+  let c = new Point2D(175,60);
+  let pitchDiam = N * m;
+
+  // Pitch radius and base radius.
+  let rp = pitchDiam / 2;
+  let rb = rp * Math.cos(phi);
+
+  ctx.lineWidth = 0.4;
+
+  if (wbut.clickState === true)
+    {
+      // Pitch circle.
+      p = new FPath();
+      p.ellipse(c.x,c.y,rp,rp,0,0,2*Math.PI);
+      ctx.stroke(p);
+
+      // Addendum
+      radd = rp + m;
+      p = new FPath();
+      p.ellipse(c.x,c.y,radd,radd,0,0,2*Math.PI);
+      ctx.stroke(p);
+
+      // Dedendum
+      rded = rp - 1.25* m;
+      p = new FPath();
+      p.ellipse(c.x,c.y,rded,rded,0,0,2*Math.PI);
+      ctx.stroke(p);
+    }
+
+
+  // Point along parameterization where involute meets pitch circle.
+  let t = Math.tan(phi);
+
+  // Adjustment to width of the base of the teeth due to the fact that
+  // the teeth are of varying width. Note that the radius of the base circle
+  // doesn't matter.
+  let ipt = invo2(t);
+  let alpha = -Math.atan2(ipt.y,ipt.x);
+
+  ctx.lineWidth = 0.4;
+
+  // Each tooth, at the base, takes 2pi/2N + 2 alpha. The space between
+  // teeth is 2pi/2N - 2 alpha
+  //
+  // We want the x-axis to split a gap between teeth, so the first tooth
+  // starts at (pi/N - 2 alpha) / 2 = pi/2N - alpha.
+  //
+  // Using earlier function for the unit involute.
+  // Note that the angles are all backwards (reversed sign) due to LH coords.
+  //
+  // We also solve for t so that the teeth meet as they should.
+  let targetV = Math.tan(Math.PI/(2*N) + alpha);
+  let toothT = Numerical.newton(toothMeet,0.3,0,2,targetV,0.00001);
+  
+  let basicInv = FPath.parametricToBezier(invo2,0,toothT,30);
+  let basicArc = FPath.circArcToBezier(rb,0,Math.PI/N - 2*alpha);
+  basicArc = basicArc.reflectX();
+
+  let angle = -Math.PI / (2*N) + alpha;
+  ctx.strokeStyle='black';
+
+  for (let i = 0; i < N; i++)
+    {
+      // One side of tooth.
+      let inv = basicInv.rotate(angle);
+      inv = inv.scale(rb);
+      inv = inv.translate(c);
+      ctx.stroke(inv);
+
+      // Other side of tooth.
+      angle -= Math.PI / N + 2 * alpha;
+      inv = basicInv.reflectX();
+      inv = inv.rotate(angle);
+      inv = inv.scale(rb);
+      inv = inv.translate(c);
+      ctx.stroke(inv);
+
+      // Gap between teeth.
+      let gap = basicArc.rotate(angle);
+      gap = gap.translate(c);
+      //ctx.strokeStyle='blue';
+      ctx.stroke(gap);
+
+      angle -= Math.PI / N - 2*alpha;
+    }
+}
+
+\end{figput}
+\caption{Gear with Addedenum and Dedendum Circles.}
+\label{fig-gear-with-add-ded}
+\end{figure}
+
+It is now possible to specify the standard tooth profile for a gear
+with arbitrary parameters, as in Figure ({\ref{fig-final-gear}). The
+value for $t$ to which the parameterization of the involute extends
+must be adjusted. Instead of extending out to the value of $t_0$ for
+which 
+$${\sin t_0 - t_0\cos t_0\over \cos t_0 + t_0\sin t_0} = \tan\theta,$$
+$t$ must be chosen so that $|i(t)| = r_p + a$. This is simpler to
+determine since $\theta$ no longer plays a role. As in an earlier
+calculation, we must have
+\begin{eqnarray*}
+(r_p+a)^2 &=& |i(t)|^2 \\
+&=& r_b^2(1+t^2)
+\end{eqnarray*}
+or
+$$t\ =\ \sqrt{\left({r_p+a\over r_b}\right)^2 - 1}\ =\ 
+\sqrt{\left({r_p+a\over r_p\cos\phi}\right)^2 - 1}.$$
+Of course, $a$ can't be chosen to produce a value for $t$ larger than $t_0$.
+
+When drawing gears with a given addendum, it can be useful to know the
+angle subtended by the top land. As noted above, the angle subtended
+relative to the base circle by each tooth is $\pi/N + 2\alpha$. Let
+$t_d$ be the value for $t$ at which the top land begins. Each
+side of the tooth, from the base circle to the top land subtends the
+angle $\beta$, where $\tan\beta = i_y(t_d)/i_x(t_d)$. The top land
+thus subtends the angle $\pi/N + 2\alpha - 2\beta$.
+
+\begin{figure}
+\begin{figput}{gearfinal,200bp}[done,skip]
+function gearfinal(ctx) {
+
+  // As above, but allow the user to tweak the settings. Further, we use the
+  // standard values for addendum and dedendum. This changes the way the
+  // involutes and gaps are drawn.
+  //
+  // BUG: There's some problem here of a mathematical or graphical nature.
+  // If I lift the restrictions on the inputs, things go haywire at
+  // the extremes.
+  
+  // Default pressure angle, number of teeth and module.
+  let phi = 20 * Math.PI / 180;
+  let N = 15;
+  let m = 5;
+
+  // Let the user change these.
+  let leftInput = -50;
+  let toothInput = NumberInputWidget.register(ctx,leftInput,20,15,"tooth");
+  N = parseInt(toothInput.getValue());
+  if (N < 4)
+    {
+      toothInput.theWidget.value = 4;
+      N = 4;
+    }
+  if (N > 30)
+    {
+      toothInput.theWidget.value = 30;
+      N = 30;
+    }
+    
+  let paInput = NumberInputWidget.register(ctx,leftInput,35,20,"pa");
+  phi = parseFloat(paInput.getValue());
+  if (phi > 25)
+    {
+      paInput.theWidget.value = 25;
+      phi = 25;
+    }      
+  if (phi < 5)
+    {
+      paInput.theWidget.value = 5;
+      phi = 5;
+    }
+  phi = phi * Math.PI / 180;
+
+  let moduleInput = NumberInputWidget.register(ctx,leftInput,50,5,"mod");
+  m = parseFloat(moduleInput.getValue());
+  if (m > 6)
+    {
+      moduleInput.theWidget.value = 6;
+      m = 6;
+    }
+  if (m < 1)
+    {
+      moduleInput.theWidget.value = 1;
+      m = 1;
+    }
+
+  let leftText = -120;
+  let upText = 30;
+  ctx.font = '10px san-serif';
+  ctx.fillStyle = 'black';
+  drawTextBrowserOnly(ctx,'Tooth Count',leftText,35-upText);
+  drawTextBrowserOnly(ctx,'Pressure Angle',leftText,50-upText);
+  drawTextBrowserOnly(ctx,'Module',leftText,65-upText);
+  
+  // Addendum and dedendum.
+  // BUG: I could let the user adjust these too.
+  let a = m;
+  let b = 1.25 * m;
+  
+  let c = new Point2D(150,100);
+  let pitchDiam = N * m;
+
+  // Pitch radius and base radius.
+  let rp = pitchDiam / 2;
+  let rb = rp * Math.cos(phi);
+
+  ctx.lineWidth = 0.4;
+
+  // Center of gear.
+  let p = new FPath();
+  p.ellipse(c.x,c.y,1.5,1.5,0,0,2*Math.PI);
+  ctx.fill(p);
+
+  // Point along parameterization where involute meets pitch circle.
+  let t = Math.tan(phi);
+
+  // Adjustment to width of the base of the teeth due to the fact that
+  // the teeth are of varying width. Note that the radius of the base circle
+  // doesn't matter.
+  let ipt = invo2(t);
+  let alpha = -Math.atan2(ipt.y,ipt.x);
+
+  // Determine the maximum value for t. This is the point at which the
+  // sides of a tooth meet. It determines the maximum possible value
+  // for the addendum.
+  let targetV = Math.tan(Math.PI/(2*N) + alpha);
+  let maxT = Numerical.newton(toothMeet,0.3,0,2,targetV,0.00001);
+
+  // Now the value of t determined by the addendum.
+  let T = Math.sqrt(((rp + a)/rb)**2 - 1);
+  if (T > maxT)
+    T = maxT;
+
+  // These are the parts of the gear profile. There's a tricky thing here in
+  // that the arc subtended by the top land must be determined.
+  // The arc subtended by half a tooth (out to maxT) is known to be
+  // pi/(2N) + alpha, but the involute now spans a smaller angle and the top
+  // land makes up the difference. This smaller angle is determined by
+  // invo(T), and the angle is beta such that
+  // tan(beta) = y(T)/x(T).
+  let basicInv = FPath.parametricToBezier(invo2,0,T,30);
+  let basicBot = FPath.circArcToBezier(rp-b,0,Math.PI/N - 2*alpha);
+
+  ipt = invo2(T);
+  let beta = -Math.atan2(ipt.y,ipt.x);
+  let basicTop = FPath.circArcToBezier(rp+a,0,Math.PI/N + 2*alpha - 2*beta);
+
+  // Due to LH coordinates.
+  basicTop = basicTop.reflectX();
+  basicBot = basicBot.reflectX();
+
+  // Add a radial line on each side of basicInv so that the tooth reaches
+  // the dedendum circle.
+  basicInv = basicInv.scale(rb);
+  basicInv.frontLineTo(rp-b,0);
+
+  let angle = -Math.PI / (2*N) + alpha;
+  ctx.strokeStyle='black';
+
+  for (let i = 0; i < N; i++)
+    {
+      // One side of tooth.
+      let inv = basicInv.rotate(angle);
+      inv = inv.translate(c);
+      ctx.stroke(inv);
+
+      // Arc of top land.
+      let top = basicTop.rotate(angle - beta);
+      top = top.translate(c);
+      ctx.stroke(top);
+      
+      // Other side of tooth.
+      angle -= Math.PI / N + 2 * alpha;
+      inv = basicInv.reflectX();
+      inv = inv.rotate(angle);
+      inv = inv.translate(c);
+      ctx.stroke(inv);
+
+      // Gap between teeth.
+      let gap = basicBot.rotate(angle);
+      gap = gap.translate(c);
+      ctx.stroke(gap);
+
+      angle -= Math.PI / N - 2*alpha;
+    }
+}
+\end{figput}
+\caption{Standard Gear Profile.}
+\label{fig-final-gear}
+\end{figure}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\end{document}
+
+
