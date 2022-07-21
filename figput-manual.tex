@@ -1,0 +1,857 @@
+
+\documentclass[10pt]{article}
+
+% Allows various tweaks to itemize as optional arguments.
+\usepackage{enumitem}
+
+% Gives the proof environment, with a box for QED.
+\usepackage{amsthm}
+
+% Needed for things like pmatrix.
+\usepackage{amsmath}
+
+% This allows footnotes from within array environment.
+\usepackage{footnote}
+\makesavenoteenv{array}
+
+% To adjust font sizes more easily.
+\usepackage{relsize}
+
+% This allows \verb in footnotes
+\usepackage{fancyvrb}
+
+% This allows me to say 
+% \begin{figure}[H]
+% to mean ``here, and don't argue.'' Note the captial 'H'.
+\usepackage{float}
+
+% This is the modern thing to do, but the manual is 1300 pages!
+\usepackage{tikz}
+\usepackage{pgfplots}
+
+
+\begin{document}
+
+% Need this for fancyvrb to work.
+\VerbatimFootnotes
+
+% So that I don't have to type this all the time.
+\newcommand{\figput}{\textsc{FigPut}}
+
+
+\begin{center}
+  {\Large \figput}
+  
+  Interactive Figures for \LaTeX
+
+  \verb=https://github.com/rsfairman/figput=
+
+  Randall Fairman
+
+  Version 0.90, July 21, 2022
+\end{center}
+
+\vskip 0.2cm
+
+The \textsc{FigPut} system allows \LaTeX\ to produce interactive
+figures. The system produces a static PDF file, as usual; in addition,
+the document can be viewed with an Internet browser and the figures
+become interactive. See the prototype in {\tt example/example.tex}
+to clarify what follows.\footnote{The version available on CTAN
+includes only what is strictly necessary to rebuild the document from
+scratch: {\tt example.tex} and {\tt exteernalcode.js}. The repository at {\tt
+  github} includes all the files that result from the build process,
+and are necessary to view the PDF in  either static or interactive
+form.} To view this example in its fully interactive form, see
+\verb=rsfairman.github.io/figput-example/=.
+
+% For some reason \textsc doesn't work within \section
+\section{Why \normalfont\scshape{FigPut}}
+
+There are many ways to produce figures in \LaTeX: MetaPost, TikZ,
+PSTricks, XY-pic, {\tt graphics}, {\tt picture}, and more. Creating
+technical figures is often an exercise in programming, and none of
+these is based on a commonly used programming
+language. \textsc{FigPut} is based on JavaScript (JS), which is
+probably the most widely used language today. Moreover,
+\figput\ allows figures to be animated and/or interactive.
+
+Aside from the fact that figures are specified with
+JavaScript, the system is normal \LaTeX. An important feature is that
+the two forms of the document -- static PDF and interactive -- look 
+identical, with the same pagination and formatting. The reader can
+move between the printed version and the interactive version without
+needing to reorient. 
+
+% For some reason \textsc doesn't work within \section
+\section{Using \normalfont\scshape{FigPut}}
+
+Here's a list of all the commands available in \figput:
+\begin{verbatim}
+\begin{figput} ... \end{figput}
+\FigPut
+\SetInnerMargin
+\SetOuterMargin
+\NeverSkip
+\AllowSkip
+\LoadFigureCode
+\end{verbatim}
+
+\subsection{The \LaTeX\ Side}
+
+Interactive figures are specified with the {\tt figput}
+environment or the \verb=\FigPut= command. The full form of the
+environment specification is
+\vskip 0.2cm
+
+\noindent\verb=\begin{figput}{<fig_name>,<fig_ht>}[=\emph{optional arguments}\verb=]=
+
+\noindent\verb=  <JavaScript code>=
+
+\noindent\verb=\end{figput}=
+\vskip 0.2cm
+
+\noindent There are two mandatory arguments: \verb=<fig_name>= and
+\verb=<fig_ht>=. Every figure must have a unique name. This name is
+unrelated to any \verb=\label= or other identifier used for
+the figure. The \verb=<fig_ht>= is the height of the figure, expressed
+like other \LaTeX\ lengths in {\tt pt}, {\tt cm}, \emph{etc}. The
+figure is allocated this much vertical space on the page. The
+remaining optional arguments are discussed below.
+
+The {\tt <JavaScript code>} is used to draw the figure, and the only
+requirement is that it be given as
+\begin{verbatim}
+function <fig_name>(ctx) {
+  ...
+}
+\end{verbatim}
+The name of the JS function must match the figure name given to the
+{\tt figput} environment -- that's how the browser finds the correct
+JS function to draw a particular figure. The {\tt ctx} argument
+is required; it's the ``rendering context'' used for
+drawing.\footnote{\label{page-ctx} A variable of this type is commonly obtained in
+JavaScript by something like \vspace{-1.5mm}
+\begin{verbatim}
+let canvas = document.getElementById('where-drawing-happens');
+let ctx = canvas.getContext('2d');
+\end{verbatim}
+\vspace{-1.5mm} The full name for this type is {\tt
+  CanvasRenderingContext2D}.}
+
+All of the JS functions for the various figures share the same
+name-space, and it is perfectly acceptable to share functions between
+figures or to define helper functions within a figure's
+environment. If many figures use the same {\tt drawDoodad()}
+function, then that function should appear with only a single figure, and
+it will be available to all of them. 
+
+Use \verb=\SetInnerMargin= and \verb=\SetOuterMargin= to set the inner and outer
+margins (which may differ in a book that has left and right
+pages). The figure will be rendered within a rectangle that is set in
+from the left margin by the given amount. For example, you might say
+\begin{verbatim}
+\SetInnerMargin{150pt}
+\SetOuterMargin{150pt}
+\end{verbatim}
+so that the left edge of the figure is {\tt 150pt} from the left edge
+of the paper. These values can be changed before every figure, if that
+is appropriate.
+
+The coordinate system used within the JS code is based on big points ({\tt
+  bp}), with the origin at the lower-left corner of the
+figure. The $y$-coordinate increases as you move \emph{up} the page.
+The $y$-axis is offset from the edge of the page by the
+value given to \verb=\SetInnerMargin= or \verb=\SetOuterMargin=.
+
+There is no need to begin the drawing by erasing the drawing
+area. That's done automatically.
+
+\subsubsection*{Optional Arguments}
+
+The arguments to {\tt figput} in {\tt []}, are optional. The first two
+of these arguments are \label{ht-above-below}
+\begin{verbatim}
+ht_above, ht_below 
+\end{verbatim}
+If these arguments appear, then they must both appear, they must be
+the first two arguments, and they must be given in that order (above,
+then below); furthermore, they must include a unit specification, like {\tt
+  bp}. An interactive figure may need a bit of extra clearance 
+for an animation or space for widgets that aren't part of the
+figure itself. The static version of the document always uses
+\verb=<fig_ht>= for the figure height, while the interactive form adds
+this optional amount of space above and below the figure. If
+\verb=ht_below= is non-zero, then the $y$-axis is \verb=ht_below=
+above the bottom of the figure when drawn interactively.
+
+The remaining optional arguments may appear in any order and function
+as boolean flags:
+
+\begin{itemize}[itemsep=-1pt,leftmargin=2cm]
+  \item[{\tt nostatic}] Use this when the figure is to be shown only
+    when the document is viewed interactively. No figure will appear
+    in the PDF. Almost certainly, the mandatory \verb=fig_ht= argument
+    should be zero. The sum of \verb=ht_above= and \verb=ht_below= is
+    used for the height of the interactive figure.
+  \item[{\tt done}] indicates to the browser that the {\tt .tikz}
+    should not be updated.
+  \item[{\tt skip}] TikZ files can be large and take a long time to
+    process. When this is set, the TikZ file won't be loaded and the
+    figure will appear with a default ``not available'' message.
+\end{itemize}
+
+When the composition of a figure is complete, it often makes sense to
+turn on the {\tt done} and {\tt skip} flags. Using {\tt skip} saves
+time, and {\tt done} prevents inadvertent overwriting of a {\tt .tikz}
+file that you're happy with. However, to see the complete output, with
+your figures, you would have to go back and tediously remove all of
+the {\tt skip} flags. Use \verb=\NeverSkip= to avoid that tedium and
+disable all the {\tt skip} 
+flags that occur until the next \verb=\AllowSkip=. 
+
+\subsection*{The {\tt \textbackslash FigPut} Command}
+
+\verb=\FigPut= takes exactly the same arguments as the {\tt figput}
+environment, but the JS code must appear in an external file. The
+location of this external file is indicated with
+\verb=\LoadFigureCode=. If the code is found in {\tt mydrawcode.js},
+then
+\begin{verbatim}
+\LoadFigureCode{mydrawcode.js}
+\end{verbatim}
+must appear somewhere in the {\tt .tex} file.
+
+It is often easier to use an external file to consolidate the drawing
+code in fewer files (or a single file). Not only
+does it make the {\tt .tex} file shorter and easier to navigate, but it
+allows the use of programming tools tailored to JS. For instance,
+the code could be written in TypeScript and compiled to JS. On the other
+hand, if the code for the figures is brief, then it may be clearer and more
+direct to use the {\tt figput} environment so that the code is in the
+{\tt .tex} file. 
+
+\subsubsection*{Additional Remarks}
+
+There is no explicit provision in \textsc{FigPut} for changing the
+body of the text based on whether the document is to be viewed statically
+or interactively. This is intentional. The aim is for the text and its
+layout to be \emph{identical} in the two scenarios. However, it would
+be relatively straightforward to set up a couple of commands like
+\begin{verbatim}
+\newcommand{\statictext}[1]{#1}
+\newcommand{\intereactivetext}[1]{ }
+\end{verbatim}
+In the above example, anything that appears in \verb=\statictext{}=
+will pass through to the \LaTeX\ document, while everything in
+\verb=\interactivetext{}= will be ignored. Swap these two definitions
+depending on whether the document is being compiled for interactive or
+static reading.
+
+\subsection{Workflow}
+
+There are several phases to composing and releasing a document. The
+first phase is a loop through writing the \LaTeX, compiling it, viewing
+the output in a browser and generating TikZ, until the document is
+done. Everything in the first phase is local to your machine. The
+second phase is posting the result to a public-facing website. The
+first phase is discussed here; see Section \ref{sec-distributing} for
+the second phase.
+
+\subsubsection*{Setup}
+
+The functionality of \figput\ is given by {\tt figput.sty}. It
+requires the following packages: {\tt zref}, {\tt xsim}, {\tt tikz}
+and {\tt verbatim}.
+
+A typical arrangement is to have a {\tt javascript}
+directory with the files for the browser side of the framework, and a
+\LaTeX\ directory where the document is written in the usual way. The {\tt 
+  javascript} directory contains the JS files and the one HTML file needed
+to provide the browser front-end, and you'll also find {\tt server.py}.
+This Python script runs a local server so that your browser can
+open and view the document being written.\footnote{This requires
+Python 3 -- although that's probably obvious these days.} In principle, it's no
+different than a normal web-server, but it is tailored in several
+ways to the task at hand. To invoke this server, use the command-line
+to go to the {\tt javascript} directory and type
+\begin{verbatim}
+python server.py directory/nameof.pdf [port_num]
+\end{verbatim}
+The {\tt directory/nameof.pdf} argument is required and should be the
+path from the current ({\tt javascript}) directory to the PDF being
+generated by \LaTeX. Often, this will be something like
+\begin{verbatim}
+../../latex_area/num_theory/hairy_math.pdf
+\end{verbatim}
+The optional \verb=port_num= argument indicates the TCP/IP port on which the
+server will listen. It defaults to 8000. In principle, any integer in
+the range $[0,2^{16})$ could appear here, but certain values are
+restricted and others may already be in use. Stick to values
+in the range 8000-8100, and you should be safe.\footnote{See
+\verb=en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers=}
+
+By using different port numbers, it's possible to run several servers
+at once, so that multiple documents can be viewed and edited at the
+same time. Once the server is running, point your browser to
+\verb=localhost:8000= (or whatever \verb=port_num= you've chosen) to
+load the document.
+
+As stated, {\tt server.py} differs from a normal web-server in certain
+ways. This is done to make it easier to work with a document while it
+is being written. Once the document is complete, it can be served by a
+normal web-server.
+
+\subsubsection*{Additional Files}
+
+There are two additional directories in the {\tt javascript} directory:
+{\tt development} and {\tt release}. \figput\ was written in
+TypeScript, and the {\tt .ts} files are in {\tt development}. Even if
+you don't want to modify the system, the TypeScript files are easier
+to follow than the JavaScript files, and are the first place to look to
+clarify how the system works internally. There are four files:
+\begin{itemize}[itemsep=-1pt,leftmargin=1cm]
+\item{\tt main.ts} is the main entry-point for the program. This is
+  unlikely to interest anyone who wants to simply use \figput.
+\item{\tt layout.ts} handles page layout -- also uninteresting to most people.
+\item{\tt widgets.ts} has the code for the various widgets. If widgets
+  aren't acting the way you expect, then look here.
+\item{\tt tikz.ts} handles lower-level geometry, and conversion from
+  JS to TikZ. Look here for details about the {\tt Point2D} and
+  {\tt FPath} classes.
+\end{itemize}
+
+Two files found in the {\tt javascript} directory are {\tt
+  pdf.worker.min.js} and {\tt pdf.js}. These are the source files for
+Mozilla's pdf.js library. The complete project can be found at
+\verb=github.com/mozilla/pdf.js=. The files are included here because,
+when developing a \LaTeX\ document on your local machine, it would be
+pointless (and slow) to download these files every time an updated
+version of your document is loaded.
+
+The {\tt release} directory contains the files to be used when the
+document is released to a public-facing website. As noted above, {\tt
+  server.py} works differently than a normal web-server. The release
+process is discussed in more detail in Section \ref{sec-distributing}.
+
+\subsubsection*{From JavaScript to TikZ}
+
+Once the server is running, a browser can view documents created with
+\figput, but the figures will not be visible in
+the PDF document until a TikZ file is provided. The \emph{Get TikZ}
+button in the browser window generates the TikZ files. The server
+will save these files to the same directory as the PDF file. Note that
+a TikZ file will only be generated if the figure has been scrolled
+into view (or nearly into view) since the document was loaded.
+
+Because TikZ files can take time to load, it's often useful to
+compose the figures one (or a few) at a time. Apply the optional
+{\tt done} argument for any figures that are complete, and the
+\emph{Get TikZ} button will not generate TikZ files for them. You may
+want a particular frame from an animation; once you have the right
+frame, it would be frustrating to accidentally overwrite it in the course of 
+working on some other figure. Using {\tt done} prevents that from happening.
+
+\subsection{JavaScript Drawing}
+
+In most respects, any JS code can be used with FigPut, but it must be
+possible to translate the JS drawing commands to TikZ, and that leads
+to certain requirements. In a nutshell, all drawing must be done using a
+class that is very similar to JS's built-in {\tt Path2D} class. 
+
+If this is too restrictive, then it is possible to side-step the
+requirement with a bit of extra effort. If you use JS drawing commands
+that are off-limits, like {\tt drawImage()}, then the interactive version
+will work fine, but you'll have to find some other way to generate the
+figure for inclusion in the static PDF. Any of the usual methods of
+generating figures for \LaTeX\ documents will work, but now the two
+versions, interactive and static, are generated from different
+source-code.
+
+Earlier, in a footnote on p. \pageref{page-ctx}, it was a stated that
+the {\tt ctx} argument to your drawing function has the standard JS type, {\tt
+  CanvasRenderingContext2D}. That's not always true. Any drawing
+done \emph{to the browser} is \emph{precisely} an object of this
+type. If you only care about seeing your document within the browser
+framework, and you don't care about generating figures for a
+standalone {\tt .pdf} file, then that's all you need to know. Draw
+with JS however you like. 
+
+To produce TikZ output, the built-in {\tt CanvasRenderingContext2D}
+must be ``spoofed.'' All of the drawing commands that normally go to
+the built-in JS browser code go to \figput's {\tt CTX} class
+instead, where they are converted to TikZ output.
+This class implements a sub-set of the full list of drawing
+commands normally available. The permitted commands are
+\begin{verbatim}
+  ctx.fill()
+  ctx.stroke()
+  ctx.lineWidth
+\end{verbatim}
+These work almost as they normally do. The {\tt lineWidth} is the
+thickness of any paths, and can be thought of as being in \TeX's {\tt
+  bp} units. The {\tt fill()} and {\tt stroke()} commands normally
+take a JS {\tt Path2D} object, but you should pass an object of type
+{\tt FPath} instead.
+
+The methods of {\tt FPath} listed below are exactly like those found
+in {\tt Path2D}. They add a new segment to an existing {\tt FPath},
+obtained with {\tt new}. See any JS resource for an explanation. 
+\begin{itemize}[itemsep=-1pt,leftmargin=*]
+\item {\tt closePath()}
+\item {\tt moveTo()}
+\item {\tt lineTo()}
+\item {\tt bezierCurveTo()}
+\item {\tt ellipse()}
+\end{itemize}
+And these methods of {\tt FPath} are new -- they have no counterpart
+in {\tt Path2D}.
+\begin{itemize}[itemsep=-1pt,leftmargin=*]
+\item {\tt addPath(p)} appends the {\tt FPath}, {\tt p}, to an
+  existing {\tt FPath}. 
+\item {\tt translate(p)} translates an {\tt FPath} by the given {\tt Point2D}.
+\item {\tt rotate(angle)} rotates an {\tt FPath} by the given angle,
+  in radians.
+\item {\tt scale(s)} scales an {\tt FPath} by the given factor
+  (relative to the origin).
+\item {\tt reflectX()} reflects an {\tt FPath} across the $x$-axis.
+\item {\tt reflectXY()} reflects an {\tt FPath} across the $x$ and $y$-axis.
+\item {\tt rotateAbout(angle,p)} rotates a given {\tt FPath} about the
+  given {\tt Point2D} by the given angle.
+
+The methods above apply to an existing {\tt FPath} and return a new {\tt FPath}.
+\item {\tt parametricToBezier(f,t0,t1,n)} converts a parametric
+  function, {\tt f(t)}, to a path consisting of {\tt n} B\'ezier
+  curves as   {\tt t} runs from {\tt t0} to {\tt t1}. The function
+  must be defined to return {\tt Point2D} objects.
+
+This is a static method, so it returns a new {\tt FPath} that is unrelated to any existing {\tt FPath} objects.
+\end{itemize}
+There are several additional methods in {\tt FPath} that may be
+useful, but they haven't yet been tested well enough to mention
+here (and they may change in the future). See the source code if
+you're adventurous. 
+
+Several of the methods above mention the {\tt Point2D} class, and it's what you would expect. Use
+\begin{verbatim}
+  new Point2D(x,y);
+\end{verbatim}
+to create these objects. There's a long list of methods defined in the
+class: {\tt translate()}, {\tt rotate()}, {\tt length()},
+\emph{etc}. See the source code for a complete list. 
+
+Text is drawn in a way that is further from how it's normally done in
+JS. Instead of calling {\tt ctx.fillText()}, there are three top-level
+functions (not part of any class) for drawing text:
+\begin{verbatim}
+  drawText(ctx,txt,x,y,dx,dy);
+  drawTextBrowserOnly(ctx,txt,x,y,dx,dy);
+  drawTextTikZOnly(ctx,txt,x,y,dx,dy);
+\end{verbatim}
+The arguments are the same in the three cases, but the first function will draw
+text to both the browser window and the TikZ, while the other two will
+draw the text to only one destination or the other. The {\tt ctx} is
+the same as the argument to your drawing function, {\tt txt} is the
+string to be drawn, {\tt x,y} is the location of the text \emph{for
+the browser}, relative to the lower-left corner of the
+bounding-box. When the text is drawn to TikZ, it is drawn at {\tt
+  x+dx,y+dy}. Because the fonts used in the browser and in TikZ differ
+slightly, sometimes it's necessary to tweak the TikZ placement. Setting
+\begin{verbatim}
+  ctx.font = '10px san-serif';
+\end{verbatim}
+sets the browser font to something very close the default font used
+by TikZ, but it's not a perfect match.  The {\tt dx} and {\tt dy}
+arguments are optional and default to {\tt 0}.
+
+As a bonus, the static method, {\tt Numerical.newton()}, can be used to
+solve $f(x) = y$ for $x$, given $y$. It's a naive implementation of Newton-Raphson.
+
+\subsection{JavaScript Widgets}
+
+The foregoing framework could be used an an alternative to TikZ,
+PSTricks, MetaPost, \emph{etc.}, if your aim is strictly static
+output. To make the figures interactive, there must be some means to
+accept user input -- widgets.
+
+All widgets have a static {\tt register()} method. Do not use {\tt
+  new} to create widgets! Registering a widget has the effect of
+making it available for user input, and drawing it too (with one
+exception). The arguments to these {\tt register()} methods vary with
+the widget, but the first argument is always the {\tt ctx} known to
+the drawing function, and the last argument is always a {\tt name} (a
+string). One drawing could have several widgets of the same kind and
+{\tt name} is used to distinguish 
+them. So, if a particular drawing has three buttons, then they could
+be created/registered with
+\begin{verbatim}
+let b1 = ButtonWidget.register(ctx,...,"first");
+let b2 = ButtonWidget.register(ctx,...,"second");
+let b3 = ButtonWidget.register(ctx,...,"third");
+\end{verbatim}
+These names only need to be unique within a single drawing and one
+type of widget. So, in the example above, two {\tt
+  DraggableDotWidget}s could be registered in the same drawing as
+the {\tt ButtonWidget}s with
+\begin{verbatim}
+let dd1 = DraggableDotWidget.register(ctx,...,"first");
+let dd2 = DraggableDotWidget.register(ctx,...,"second");
+\end{verbatim}
+
+\subsubsection{\tt ButtonWidget}
+
+These are registered with 
+\begin{verbatim}
+ButtonWidget.register(ctx,x,y,text,name);
+\end{verbatim}
+The {\tt x,y} argument is the location of the button, relative to the
+lower-left corner. The {\tt text} is what is shown as the message
+within the button. Buttons work by calling back to your drawing code
+whenever they are clicked. Every time the button is clicked, the
+entire drawing function is executed.
+
+There are two useful fields of {\tt ButtonWidget}. If {\tt b} is a
+{\tt ButtonWidget}, then {\tt b.clickState} toggles between {\tt true} and {\tt
+  false} with every click of the button, while {\tt b.resetState} is
+set to {\tt true} whenever the button is clicked -- and remains {\tt
+  true} until your drawing code resets it.
+
+\subsubsection{\tt NumberInputWidget}
+
+This is similar to {\tt ButtonWidget}, and is used to input single
+numbers. It's registered with 
+\begin{verbatim}
+NumberInputWidget.register(ctx,x,y,v,name);
+\end{verbatim}
+The {\tt v} argument is the initial numerical value shown in the
+widget. Whenever the user changes this value, the widget calls back
+and executes the entire drawing function. To obtain this value, call
+{\tt getValue()} on the relevant widget. Because this widget relies
+on HTML, {\tt getValue()} returns a string. It may be necessary to
+call the JS {\tt parseFloat()} or {\tt parseInt()} functions on this
+value. 
+
+\subsubsection{\tt DraggableDotWidget}
+
+A ``draggable dot'' is a small dot that can be grabbed by the mouse
+and moved around. They're registered with
+\begin{verbatim}
+DraggableDotWidget.register(ctx,x,y,name);
+\end{verbatim}
+To determine where the user has moved a dot, refer to the widget's
+{\tt widgetX} and {\tt widgetY} fields. 
+
+Most widgets are used ``off to the side'' and wouldn't normally
+interfere with the way the figure is drawn, but these dots are typically
+used as part of the drawing itself. The order in which dots are drawn
+may matter. Sometimes a dot should be drawn first, so that other
+elements of the figure may be drawn over it; and sometimes a dot
+should be drawn last so that nothing can obscure it. For this
+reason, unlike other widgets, registering the widget does not also
+draw the widget. An explicit call to the widget's {\tt
+  draw(ctx)} method must be made to draw the dot.
+
+\subsubsection{\tt DraggableDrawWidget}
+
+This is similar to {\tt DraggableDotWidget}, but it has no default
+drawing behavior. The user must provide functions to specify what is
+to be drawn. So it can also be a draggable polygon, or a draggable
+anything-you-can-draw. Register these with
+\begin{verbatim}
+DraggableDrawWidget.register(ctx,x,y,
+    drawFcn,drawSelFcn,testPosFcn,
+    name);
+\end{verbatim}
+The {\tt drawFcn} must be defined to take the {\tt ctx} as the sole
+argument. It can draw whatever it wants, noting that the origin is
+shifted so that drawing should typically take place relative to {\tt
+  (0,0)}, not {\tt (widgetX,widgetY)}. In most cases, this means
+that the drawing code is independent of where the item is on the
+page. {\tt drawFcn} must return an {\tt FPath} object to indicate
+the ``clickable area'' for the item. For example, if what is being
+drawn is a small square, then the function might be defined as
+\begin{verbatim}
+function drawSquare(ctx) {
+  let p = new FPath();
+  // p.lineTo, moveTo, etc., to make a square.
+  ctx.fillPath(p);
+  return p;
+}
+\end{verbatim}
+The value returned is noted, and any click in the interior of the path
+-- as determined by the JS function {\tt isPointInPath()} -- 
+is taken to be a valid click on the object, to select it and drag it around.
+
+The {\tt drawSelFcn} argument to {\tt register} is identical to the
+{\tt drawFcn} argument, but it is called to draw the item when it is
+``selected.'' Often, the only difference between the two functions
+will be the color used to draw the item.
+
+The {\tt testPosFcn} argument is used to determine whether a
+particular location for the item is acceptable. For example, an item
+could be limited to a particular region. This is called every time the
+mouse is moved, after the item has been selected, up until the mouse
+button is released. The function takes five arguments and returns a
+boolean. The five arguments are the proposed {\tt x,y} position (the
+mouse location), followed by the width of the drawing area, then the
+height above and below the $x$-axis, where the width is equal to the
+text width. Return {\tt true} if the 
+proposed {\tt x,y} is acceptable; {\tt false} otherwise. At a minimum,
+the function should typically check that {\tt x,y} is inside the
+figure rectangle.
+
+\subsubsection{\tt LoopAnimWidget}
+
+This widget and the next one ({\tt OpenAnimWidget}) are for
+animations, and work similarly. A {\tt LoopAnimWidget} is used for
+animations that run in a repeating loop. There are many arguments to
+register them.
+\begin{verbatim}
+LoopAnimWidget.register(ctx,x,y,scale,visWidget,
+    steps,start,timeStep,
+    visSteps,visFastSlow,visPauseRun,visCircle,triGrab,
+    name);
+\end{verbatim}
+The {\tt x,y} values are the location of the center of the circle that
+is the primary element of the widget. The widget can be made larger or
+smaller by changing the {\tt scale} -- a value of {\tt 1.0} makes the
+circle 40~{\tt bp} in radius. The {\tt visWidget} argument is a
+boolean; set it to {\tt false} to run an animation without
+showing the user this widget.
+
+{\tt steps} is the integral number of steps that make up one loop of
+the animation. {\tt start} is the step on which the animation
+starts -- so that the animation starts with the {\tt start}-th
+frame. {\tt timeStep} is the number of milliseconds between
+frames. Unless the machine is \emph{very} fast, anything less than
+{\tt 10} for {\tt timeStep} is probably pointless, and a setting of
+{\tt 50} or {\tt 75} is more reasonable considering the human eye.
+
+The next group of arguments -- {\tt visSteps} through {\tt triGrab} -- are
+all booleans. They determine whether certain parts of the widget are
+visible. {\tt visSteps} shows or hides an area above the circle that
+can be used to change the number of steps taken per frame. The user
+can use this control to skip frames of the animation. {\tt
+  visFastSlow} is for some ``sideways chevrons,'' in an area below the circle,
+that allow the user to change the number of milliseconds per
+frame. {\tt vsPauseRun} is for a pause/run control below the
+circle. {\tt visCircle} is for the entire circle. The circle has a
+small grabable triangle to indicate which frame is being shown; use
+{\tt triGrab} to show or hide the triangle.
+
+To draw a particular frame from your drawing function, refer to the
+{\tt curStep} field of the object. This will be a value in the range
+from 0 to the {\tt steps} argument to {\tt register()}. 
+
+\subsubsection{\tt OpenAnimWidget}
+
+This widget is for open-ended animations that don't run in a loop,
+but continue ``forever.'' Whereas {\tt LoopAnimWidget} indicates the
+frame being viewed relative to a circle, {\tt OpenAnimWidget} uses a
+bar, something like a scroll-bar. Registration is similar to
+{\tt LoopAnimWidget}: 
+\begin{verbatim}
+OpenAnimWidget.register(ctx,x,y,scale,width,visWidget,
+    timeStep,decay,
+    visSteps,visFastSlow,visPauseRun,visBar,barGrab,
+    name);
+\end{verbatim}
+The {\tt ctx}, {\tt x}, {\tt y}, {\tt scale} and {\tt visWidget}
+arguments are as for {\tt LoopAnimWidget}. {\tt width} sets the width
+of the bar, in {\tt bp}.
+
+{\tt timeStep} is in milliseconds, as for {\tt LoopAnimWidget}. The
+{\tt decay} is used to adjust the rate of travel of the ``thumb'' along the
+bar as the animation progresses. Since the animation is potentially
+infinite, the thumb moves quickly early in the animation, then moves
+more and more slowly, so that it never quite reaches the end of the
+bar. The position of the thumb is given by
+$$1 - {1\over (1+{\tt decay})^s},$$
+expressed as a fraction of the bar's total length, where $s$ is the
+frame count (\emph{i.e.}, {\tt curStep}). A reasonable setting for {\tt
+  decay} is something in the range of $10^3$ to $10^6$, although it
+will depend on the animation. 
+
+The arguments from {\tt visSteps} to {\tt barGrab} are all boolean and
+control which controls that make up the widget are visible. They're
+like their counterparts in {\tt LoopAnimWidget}, except that {\tt
+  OpenAnimWidget} uses a bar instead of a circle.
+
+\section{Distributing a Complete Document}
+\label{sec-distributing}
+
+The PDF document is no different than any other PDF, and can be
+distributed in the usual ways. When moving the document in interactive
+form to a public-facing website, a few steps are necessary.
+
+See the {\tt javascript/release} directory. It has two files: {\tt
+  figput.html} and {\tt figput.js}. The {\tt .js} file is just the
+four files used for the local version ({\tt main.js}, \emph{etc}.),
+consolidated to a single file and minified. These two files must
+appear on the web-server in the same directory as the various files
+that make up your document.
+
+{\tt figput.html} is only a few lines long, and there are two
+important changes that must be made. See the line that reads
+\vskip 0.2cm
+\noindent\verb!<body onload="doOpenDocument('unknown1',unknowny)" id="mainbody">!
+\vskip 0.2cm
+\noindent Change {\tt unknown1} to your document's name, \emph{without} the
+{\tt .pdf} suffix. If the document was generated from {\tt
+example.tex}, then {\tt unknown1} should be changed to {\tt example}.
+Second, change {\tt unknowny} to {\tt 0}. When the document is
+opened, this is the vertical position, in {\tt bp}, at which the document is
+opened. Setting {\tt unknonwy} to {\tt 0} means that the document
+will open at the top of the first page. Of course, it's possible
+that you want the document to open at some other location, in which
+case use some other value for {\tt unknowny}.
+
+The server needs {\tt figput.html} (after the modifications
+above), {\tt figput.js}, and the files that make up your
+document. These files consist of the {\tt .pdf} file, the {\tt .fig.aux}
+file, any {\tt .js} files referred to by \verb=\LoadFigureCode=, plus
+any {\tt .fjs} files generated by your document. The server does not
+need the {\tt .tikz} files. 
+
+\section{Code Internals}
+
+An understanding of this section isn't necessary to use \figput; it's
+here to provide a bit of background for anyone who wants to improve
+or modify the framework. Most of \figput\ is in TypeScript, which
+should make it easier to follow.
+
+Throughout the various files that make up the system are
+{\tt BUG} annotations. These are not bugs \emph{per se}, but are more
+like infelicities, opportunities for improvement, or to draw attention
+to something confusing or problematic. If you want to contribute to
+\figput, then these are a good place to start.
+
+\subsection{\tt figput.sty}
+
+The {\tt .sty} file is well-commented and should be
+self-explanatory. However, I am far from an expert in \LaTeX3
+programming. Here is a high-level list of ways in which it might be
+possible to improve things.
+
+\begin{itemize}[itemsep=-1pt,leftmargin=*]
+\item {\tt figput.sty} is written for \LaTeX3. The entire thing might
+  be simpler if it were in Lua\TeX.
+\item The ability to explicitly specify the inner and outer margins
+  used by \figput\ (with \verb=\SetInnerMargin= and
+  \verb=SetOuterMargin=) is useful, but it would often suffice to
+  default to the margins used by \LaTeX. How can those values be
+  obtained?
+\item Someone who is more expert in \LaTeX3 could improve the code's
+  clarity and brevity.
+\item It would be nice if \figput\ could create figures within a {\tt
+  minipage}, but that would require extensive changes to both the
+  \LaTeX\ and browser code.
+\end{itemize}
+
+\subsubsection*{A Quirk}
+
+\LaTeX\ on Windows has a quirk. \TeX\ will not write to a
+file whose type is executable. Thus, it won't write to
+a {\tt .pl} file (Perl), {\tt .py} (Python) file, \emph{etc.},
+depending on how the machine is set up. \figput\ creates
+JavaScript files, which are typically saved as {\tt .js} files, and
+these may be seen as executable by Windows. Fortunately,
+browsers doesn't care what the suffix is, so \figput\ uses
+{\tt .jfs} as the suffix.  
+ 
+This limitation on the file name suffix applies to \verb=\write=, but
+not to \verb=\write18=. \TeX\ is limited in this way to prevent
+accidental errors and for security. One solution might be to have the
+package write files using an acceptable suffix, then change the
+suffix with \verb=\write18=, which does not have this
+limitation. However, to use \verb=\write18= this way, \LaTeX\ would
+have to be invoked with something like
+\begin{verbatim}
+pdflatex -shell-escape
+\end{verbatim}
+which would be annoying. 
+
+\subsection{\tt server.py}
+
+The server is a simple thing, so there's not much to say. It
+would be nice if it were written in a compiled language so
+that the user doesn't need to install Python.
+
+\subsection{Browser Code}
+
+This part is written in TypeScript (TS), which is essentially JS with
+type annotations. It must be translated 
+to JS for the browser to run it, but TS code is easier to follow, and
+the type information heads off many programming errors.
+
+Although the program is (to my knowledge!) bug-free in the usual
+sense, there are plenty of {\tt BUG} annotations to draw attention to
+places where the code could be improved. Some of the higher-level
+possibilities for improvement are noted below.
+\begin{itemize}[itemsep=-1pt,leftmargin=*]
+\item \figput\ relies on the {\tt pdf.js} library for rendering
+  PDFs. The result is not as crisp as I would like. It's unclear
+  whether the problem is with the library itself, or how it is being
+  used. Someone who knows that library well may be able to improve the
+  output. Maybe a different library would work better.
+\item Most of the widgets do not rely on the DOM, but {\tt
+  NumberInputWidget} and {\tt ButtonWidget} are based on the built-in
+  DOM elements. It would be nice if these didn't use the DOM.
+\item Many additional widgets could be created.
+\item Adjust the font used for figures in the browser to make it more
+  nearly identical to what appears in the PDF. 
+\item Color is entirely neglected on the \LaTeX\ end of \figput. Browser output
+  can be colored arbitrarily (with {\tt ctx.fillStyle} or {\tt
+    ctx.strokeStyle}, as usual), but the TikZ output is limited to
+  black and white. 
+\item Double-buffer everything. Animations seem to run fine,
+  without any noticeable flicker, but double-buffering \emph{all}
+  drawing would put an end to any concerns about flicker.
+\item Animations should be turned off and stop generating events when
+  they are scrolled out of view. This would save CPU cycles, which may
+  matter for documents with many animations.
+\end{itemize}
+
+\noindent And some items that are more ambitious...
+\begin{itemize}[itemsep=-1pt,leftmargin=*]
+\item Allow figures to be set within a {\tt minipage} (mentioned above).
+\item Double-clicking a figure (or something) could enlarge the figure
+  to give more room for interaction.
+\item Come up with a scheme so that the code that draws a figure could
+  be made part of the document. For certain topics, the code that
+  draws a figure can be as instructive as the figure itself.
+\item Extend the framework somehow so that it can be used within an
+  IDE. Code that's mathematically-oriented is difficult to
+  document within source code using simple text. It would be easier to
+  understand if it's explained as \LaTeX\ output that appears 
+  in the source code, rather than in a separate document.
+\item Extend the framework to allow inclusion of snippets of
+  \LaTeX\ output in standard HTML documents. Things like KaTeX and
+  MathJax are convenient, but incomplete relative to \LaTeX.
+\end{itemize}
+
+\newpage
+
+\subsection*{Version History}
+
+\begin{itemize}[itemsep = -3pt]
+\item{0.90} -- July 21, 2022. I've been using this, privately, for
+  several months. Numerous improvements and extensions are possible,
+  but it definitely works.
+\end{itemize}
+
+
+\vskip 0.3cm
+\hrule
+\vskip 0.3cm
+
+
+Thanks to Dan Pratt for insights regarding TypeScript, and
+improvements to the code.
+
+Several people on {\tt tex.stackexchange} very
+patiently answered numerous questions. Thank you.
+
+
+
+\end{document}
