@@ -1,0 +1,65 @@
+function baseandpitch(ctx) {
+
+  // A static figure, no interaction.
+  let rc = 70;
+  let y = 80;
+
+  let c = new Point2D(130,y);
+
+  // Pitch circle
+  let p = new FPath();
+  p.ellipse(c.x,c.y,rc,rc,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // Radius through pitch point
+  let pplen = rc + 50;
+  p = new FPath();
+  p.moveTo(c.x,c.y);
+  p.lineTo(c.x+pplen,c.y);
+  ctx.stroke(p);
+
+  // Line of action through P and angle phi. Use tan phi = dx / dy
+  // to draw a line through P = (c.x+rc,c.y).
+  let phi = Math.PI / 6;
+  let lenup = 70;
+  let lendown = 50;
+  let tan = Math.tan(phi);
+  p = new FPath();
+  p.moveTo(c.x + rc - lenup * tan,c.y + lenup);
+  p.lineTo(c.x + rc + lendown * tan,c.y - lendown);
+  ctx.stroke(p);
+
+  // Base circle has radius:
+  let rb = rc * Math.cos(phi);
+  p = new FPath();
+  p.ellipse(c.x,c.y,rb,rb,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // Vertical line through P.
+  let vlen = 60;
+  p = new FPath();
+  p.moveTo(c.x+rc,c.y-vlen);
+  p.lineTo(c.x+rc,c.y+vlen);
+  ctx.stroke(p);
+
+  // radial line to where line of action meets base circle.
+  p = new FPath();
+  p.moveTo(c.x,c.y);
+  p.lineTo(c.x + rb*Math.cos(phi),c.y+rb*Math.sin(phi));
+  ctx.stroke(p);
+
+  // Little hash marks to indicate angles have same measure.
+  p = FPath.circArcToBezier(16,0,phi);
+  p = p.translate(c);
+  ctx.stroke(p);
+
+  p = FPath.circArcToBezier(16,Math.PI/2 - phi,Math.PI/2);
+  p = p.reflectX();
+  p = p.translate(new Point2D(c.x+rc,c.y));
+  ctx.stroke(p);
+}
+

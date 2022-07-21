@@ -1,0 +1,381 @@
+// At one point, I was making a small manual adjustment on the figure
+// placement here. I did this by wrapping all the drawing
+// (after the \useasbounding box) with
+// \begin{scope}[shift={(40bp,0bp)}]
+// then \end{scope} just before \end{tikzpicture}
+
+function moveinvo(ctx) {
+
+  // Similar to above, but don't draw the pitch circles, and only a part
+  // of the base circles is drawn, and they're larger. There is also
+  // a line for the line of action and an animation to show what the
+  // point of contact does over time. OK, so not that similar!
+
+  let numSteps = 1000;
+  let loopw = LoopAnimWidget.register(ctx,-80,100,1.0,
+    true, // not hidden
+    numSteps, // steps per loop
+    0, // starting step
+    10, // ms time step
+    true,true,true,true,true,
+    'loop');
+
+  let rc = 80;
+  let rd = 60;
+  let y = 100;
+  let s = 35;
+
+  let c = new Point2D(90,y);
+  let d = new Point2D(c.x + rc+rd +s,y);
+
+  // Base circles
+  p = new FPath();
+
+  // I played around, trying to show only portions of the disks so as to
+  // save space, but it doesn't look right. In some ways, that
+  // simplifies things.
+  p.ellipse(c.x,c.y,rc,rc,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 1.0;
+  ctx.stroke(p);
+
+  p = new FPath();
+  p.ellipse(d.x,d.y,rd,rd,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 1.0;
+  ctx.stroke(p);
+
+  /* I was going to just draw these arcs, but better to do the
+  // whole cirles.
+  //In fact, defer drawing this. I want the entire wedge to turn.
+  // This arc is centered at (0,0).
+  let cVisAngle = 4*Math.PI/8;
+  p = FPath.arcToBezierNEW(rc,-cVisAngle,cVisAngle);
+  p = p.translate(c);
+  ctx.lineWidth = 2.0;
+  ctx.stroke(p);
+
+  let dVisAngle = 5*Math.PI/8;
+  p = FPath.arcToBezierNEW(rd,dVisAngle,-dVisAngle);
+  p = p.translate(d);
+  ctx.lineWidth = 2.0;
+  ctx.stroke(p);
+  */
+
+  // The line of action.
+  // This involves another calculation of tangent lines. See Graphics Gems I,
+  // p. 7 and Figure 8. Use similar triangles. We have two distances,
+  // x_c and x_d from the respective centers of the circles to the point
+  // where the desired line intersects the line connecting the centers.
+  // We have x_c + x_d = D = distance between centers, and by
+  // similar triangles r_c/x_c = r_d/x_d. A little algebra gives
+  // x_c = r_c D / (r_c + r_d).
+  //
+  // We now have one point that must be on the line, and we go through the
+  // same rigmarole as above to find the line tangent to a circle. The only
+  // difference is that we've chosen the point through which the circle must
+  // pass in such a way that the resulting line will be tangent to both
+  // circles if it's tangent to either of them.
+  //
+  // As above, make the simplifying assumption that circle C is centered
+  // at the origin. Then do a rotate and translate at the end.
+  let D = Math.sqrt((c.x-d.x)**2 + (c.y-d.y)**2);
+  let xc = rc * D / (rc + rd);
+
+  // We are working (for now) as though circle C is centered at the origin.
+  // So this is the point we want.
+  let M = new Point2D(xc,0);
+
+  // As in the earlier case, where I did the involute, we get the tangent.
+  // The difference is that the point is now M, not P, as it was above.
+  let Md = Math.sqrt((M.x - c.x)**2 + (M.y - c.y)**2);
+  let a = Math.acos(rc/Md);
+  let b = Math.atan2(M.y,M.x);
+  let E = new Point2D(rc*Math.cos(-a+b)+c.x,rc*Math.sin(-a+b)+c.y);
+
+  // The above draws from circle C to the central point M, but I need to
+  // extend the line all the way to the other circle. So I need to know where
+  // this line intersects that circle. Recall that M was found by similar
+  // triangles. The angle of the tangent point relative to the circles' centers
+  // is the same in both cases, although for the circle on the right, we
+  // have to adjust by pi.
+  b += Math.PI;
+  let F = new Point2D(rd*Math.cos(-a+b)+d.x,rd*Math.sin(-a+b)+d.y);
+
+  p = new FPath();
+  p.moveTo(E.x,E.y);
+  p.lineTo(F.x,F.y);
+  ctx.lineWidth = 0.6;
+  ctx.stroke(p);
+
+  // The above draws the more or less static setup. Now I want to draw a
+  // particular point on the line of action, and let it move as the disks
+  // rotate, tracing out a pair of involutes.
+  //
+  // Use M for the particular point along the line, which is detemined
+  // by t, using a linear parameterization of the line E to F.
+  // This value is what determines the frame of the animation.
+  let t;
+  if (loopw.curStep < numSteps/2)
+    t = 2* loopw.curStep/numSteps;
+  else
+    t = 2 *(numSteps - loopw.curStep)/numSteps;
+
+  M = new Point2D(E.x + t*(F.x-E.x),E.y + t*(F.y-E.y));
+
+  p = new FPath();
+  p.ellipse(M.x,M.y,1.5,1.5,0,0,2*Math.PI);
+  ctx.fillStyle = 'black';
+  ctx.fill(p);
+
+  // I need to know the total size of the tooth. So I need the value for
+  // t at which the tooth will barely clear the opposing gear. The value
+  // I am looking for has nothing to do with the current point of contact,
+  // and is always the same (which is sort of the point). Scale down the
+  // entire picture and find t for which the distance of involute(t) from
+  // the center of the left disk is equal to the distance between the
+  // edges of the two disks.
+  //
+  // BUG: A common problem is that lines have thickness. If you want line A
+  // to barely touch line B, then thicknesses matter. The strictly correct way
+  // to deal with this is probably to treat lines as filled rectangles (or
+  // quadrilaterals more generally). This general philisophy is one way to
+  // handle stuff like arrowheads. Another way might be to allow stroking
+  // the line on one side of its geometric definition or the other.
+  // I may have mentioned this issue before.
+  //
+  // See above. rc and rd are the two disks' radii and the centers at c and d.
+  // The distance we care about is d.x-c.x-rd before scaling. Subtract off
+  // a hair to take into account line thicknesses. Scaling then gives:
+  let toothD = (d.x-c.x-rd - 2) / rc;
+
+  // And the value that brings the unit involute out to this distance.
+  let toothT = Numerical.newton(solveToothD,0.5,0,3,toothD,0.00001);
+
+  // For circle C, we have an involute extending out to M.
+  // The standard parameterization of the involute assumes that the point
+  // starts at the x-axis, and that is not true here. The ``point of initial
+  // contact'' with the base circle varies, and that is sort of the point
+  // for gear design. At any rate, the usual parameterization is
+  // x(a) = r (cos a + a sin a)
+  // y(a) = r (sin a - t cos a)
+  // What we need to do is to add some constant to a so as to shift
+  // the involute -- effectively rotate it around the center of the circle.
+  //
+  // The distance from M to E is how much string wraps around the circle C.
+  // This determines the point of initial contact. Let d_M = |M-E|.
+  // When wrapped around the circle, this corresponds to an angle d_M/r_c.
+  // It wraps from the point E, and that point is at angle -a+b relative to
+  // the x-axis. So the adjustment we need to make is a_M = d_M/r_c +a-b.
+  // There's also a pi adjustment due to LH coordinates.
+  //
+  // In addition, we need to know at what value of a (as argument to the
+  // parameterization) the involute reaches M. THAT is not so easy since it
+  // amounts to inverting the involute. We want to find t such that
+  // involute(t) = M, where M is the point in question. Assuming that (u,v)
+  // is on the involute, and considering the ``standard'' involute, what
+  // we want is t such that
+  // u = cos t + t sin t
+  // v = sin t - t cos t
+  // I don't think there's any good way to do this, and a bit of googling
+  // bears that out. I'm not going to try to be mathematically clever.
+  // Just use Newton's method. So, take the point, M, and "undo" the
+  // transformation to get M relative to the standard involute -- I mean for
+  // a unit circle at the origin.
+  let dM = Math.sqrt((M.x-E.x)**2 + (M.y-E.y)**2);
+  let aM = dM/rc - a + b - Math.PI;
+
+  // Untranslate, unscale and unrotate M.
+  // BUG: This foolishness is why I should have worked with the standard unit
+  // involute throughout.
+  let unitM = new Point2D(M.x - c.x,M.y-c.y);
+  unitM = new Point2D(unitM.x/rc,unitM.y/rc);
+  unitM.rotateSelf(-aM);
+
+  // Now I want t such that invo2(t).x = unitM.x. I'm using x instead of
+  // y since y varies very little near the circle and I'm afraid that
+  // the root finder won't converge well.
+  // Note that t = 3 is roughly where the derivative changes sign.
+  // That's why it's a good place for bracketing.
+  t = Numerical.newton(solveInvo,0.5,0,3,unitM.x,0.00001);
+
+  // However, we do NOT want to use a value for t larger than toothT
+  // since the tooth would make the tooth magically grow to touch M.
+  if (t > toothT) t = toothT;
+
+  p = FPath.parametricToBezier(invo2,0,t,30);
+  p = p.rotate(aM);
+  p = p.scale(rc);
+  p = p.translate(c);
+
+  ctx.lineWidth = 1.0;
+  ctx.stroke(p);
+
+  // Now, exactly as above, draw a bit of the involute.
+  p = FPath.parametricToBezier(invo2,t,toothT,30);
+  p = p.rotate(aM);
+  p = p.scale(rc);
+  p = p.translate(c);
+
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // And...what the heck... some spokes to make the rotation
+  // more noticable.
+  p = new FPath();
+  p.moveTo(c.x,c.y);
+  let sp = new Point2D(c.x+rc,c.y);
+  sp = sp.rotateAbout(c,aM);
+  p.lineTo(sp.x,sp.y);
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // let wedgeRange = cVisAngle / 4;
+  let wedgeRange = Math.PI / 6;
+  for (let i = 0; i < 10; i++)
+    {
+      let a = aM + i*wedgeRange;
+      //if ((a <= cVisAngle) && (a >= -cVisAngle))
+        {
+          p = new FPath();
+          p.moveTo(c.x,c.y);
+          let sp = new Point2D(c.x+rc,c.y);
+          sp = sp.rotateAbout(c,a);
+          p.lineTo(sp.x,sp.y);
+          ctx.lineWidth = 0.4;
+          ctx.stroke(p);
+        }
+
+      a = aM - i*wedgeRange;
+      //if ((a <= cVisAngle) && (a >= -cVisAngle))
+        {
+          p = new FPath();
+          p.moveTo(c.x,c.y);
+          let sp = new Point2D(c.x+rc,c.y);
+          sp = sp.rotateAbout(c,a);
+          p.lineTo(sp.x,sp.y);
+          ctx.lineWidth = 0.4;
+          ctx.stroke(p);
+        }
+    }
+
+  // Now we have to do almost the same thing, but for the right disk.
+  // The twist is that the involute is now flipped relative to the
+  // earlier case because the right disk rotates in the opposite direction.
+  // That is, swap the sign of the y-coordinate, and the x-coordinate too
+  // since the disk is on the right.
+  //
+  // The tooth height is the same on the right side, but the scale is different,
+  // so the value of toothT will be different.
+  toothD = (d.x-c.x-rc - 2) / rd;
+  toothT = Numerical.newton(solveToothD,0.5,0,3,toothD,0.00001);
+
+  // What we want is for the flipped involute to pass through M, although
+  // it will pass through M at a different value for t. I could work out
+  // this t by finding it numerically. Or, I could use the fact that --
+  // because I know how gears work -- the relative rates of rotion are known.
+  // In fact, because I want the line to change at M, I do need this value
+  // for t. This is more like what happens physically: the motion of the
+  // left disk determines M, which pushes the disk on the right to rotate.
+  //
+  // Redetermine unitM, as above, but relative to the right disk.
+  // Do it afresh to avoid any rounding error.
+  dM = Math.sqrt((M.x-F.x)**2 + (M.y-F.y)**2);
+  aM = dM/rd - a + b - Math.PI;
+  unitM = new Point2D(d.x-M.x ,d.y-M.y);
+  unitM = new Point2D(unitM.x/rd,unitM.y/rd);
+  unitM.rotateSelf(-aM);
+
+  // This is the value for t at which the RH involute passes through M.
+  t = Numerical.newton(solveInvo,0.5,0,3,unitM.x,0.00001);
+  if (t > toothT) t = toothT;
+
+  // Path from disk to M
+  p = FPath.parametricToBezier(invo2,0,t,30);
+  p = p.reflectXY();
+  p = p.rotate(aM);
+  p = p.scale(rd);
+  p = p.translate(d);
+
+  ctx.lineWidth = 1.0;
+  ctx.stroke(p);
+
+  // Path from M to the tip of the tooth.
+  p = FPath.parametricToBezier(invo2,t,toothT,30);
+  p = p.reflectXY();
+  p = p.rotate(aM);
+  p = p.scale(rd);
+  p = p.translate(d);
+
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // And some spokes for visual appeal, as above.
+  // The outer arc first.
+  /*
+  dVisAngle = 5*Math.PI/8;
+  p = FPath.arcToBezier(rd,dVisAngle,-dVisAngle);
+  p = p.rotate(aM);
+  p = p.translate(d);
+  ctx.lineWidth = 2.0;
+  ctx.stroke(p);
+  */
+
+  // And the spokes.
+  p = new FPath();
+  p.moveTo(d.x,d.y);
+  sp = new Point2D(d.x-rd,d.y);
+  sp = sp.rotateAbout(d,aM);
+  p.lineTo(sp.x,sp.y);
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // In fact, the angle *spanned* by the arc is two times this.
+  // It's because of the whole LH/RH thing.
+  for (let i = 0; i < 7; i++)
+    {
+      let a = aM + i*wedgeRange;
+      //if ((a <= dVisAngle) && (a >= -dVisAngle))
+        {
+          p = new FPath();
+          p.moveTo(d.x,d.y);
+          let sp = new Point2D(d.x-rd,d.y);
+          sp = sp.rotateAbout(d,a);
+          //sp.x = d.x - (sp.x - d.x);
+          p.lineTo(sp.x,sp.y);
+          ctx.lineWidth = 0.4;
+          ctx.stroke(p);
+        }
+
+      a = aM - i*wedgeRange;
+      p = new FPath();
+      p.moveTo(d.x,d.y);
+      let sp = new Point2D(d.x-rd,d.y);
+      sp = sp.rotateAbout(d,a);
+      p.lineTo(sp.x,sp.y);
+      ctx.lineWidth = 0.4;
+      ctx.stroke(p);
+    }
+}
+
+function solveToothD(t) {
+  let p = invo2(t);
+  return Math.sqrt(p.x**2 + p.y**2);
+}
+
+function solveInvo(t) {
+  return invo2(t).x;
+}
+
+function invo2(t) {
+
+  // Involute, assuming circle of radius 1 centered at the origin.
+  // There is another function called invo(), hence this is invo2().
+  // BUG: This is the way I should have done this above. Generate a standard
+  // involute, then scale and rotate as needed.
+  let c = Math.cos(t);
+  let s = Math.sin(t);
+
+  // Note that y is backwards since LH coordinate system.
+  return new Point2D( c + t*s , - (s - t*c) );
+}

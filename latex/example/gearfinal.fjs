@@ -1,0 +1,157 @@
+function gearfinal(ctx) {
+
+  // As above, but allow the user to tweak the settings. Further, we use the
+  // standard values for addendum and dedendum. This changes the way the
+  // involutes and gaps are drawn.
+  //
+  // BUG: There's some problem here of a mathematical or graphical nature.
+  // If I lift the restrictions on the inputs, things go haywire at
+  // the extremes.
+
+  // Default pressure angle, number of teeth and module.
+  let phi = 20 * Math.PI / 180;
+  let N = 15;
+  let m = 5;
+
+  // Let the user change these.
+  let leftInput = -50;
+  let toothInput = NumberInputWidget.register(ctx,leftInput,20,15,"tooth");
+  N = parseInt(toothInput.getValue());
+  if (N < 4)
+    {
+      toothInput.theWidget.value = 4;
+      N = 4;
+    }
+  if (N > 30)
+    {
+      toothInput.theWidget.value = 30;
+      N = 30;
+    }
+
+  let paInput = NumberInputWidget.register(ctx,leftInput,35,20,"pa");
+  phi = parseFloat(paInput.getValue());
+  if (phi > 25)
+    {
+      paInput.theWidget.value = 25;
+      phi = 25;
+    }
+  if (phi < 5)
+    {
+      paInput.theWidget.value = 5;
+      phi = 5;
+    }
+  phi = phi * Math.PI / 180;
+
+  let moduleInput = NumberInputWidget.register(ctx,leftInput,50,5,"mod");
+  m = parseFloat(moduleInput.getValue());
+  if (m > 6)
+    {
+      moduleInput.theWidget.value = 6;
+      m = 6;
+    }
+  if (m < 1)
+    {
+      moduleInput.theWidget.value = 1;
+      m = 1;
+    }
+
+  let leftText = -120;
+  let upText = 30;
+  ctx.font = '10px san-serif';
+  ctx.fillStyle = 'black';
+  drawTextBrowserOnly(ctx,'Tooth Count',leftText,35-upText);
+  drawTextBrowserOnly(ctx,'Pressure Angle',leftText,50-upText);
+  drawTextBrowserOnly(ctx,'Module',leftText,65-upText);
+
+  // Addendum and dedendum.
+  // BUG: I could let the user adjust these too.
+  let a = m;
+  let b = 1.25 * m;
+
+  let c = new Point2D(150,100);
+  let pitchDiam = N * m;
+
+  // Pitch radius and base radius.
+  let rp = pitchDiam / 2;
+  let rb = rp * Math.cos(phi);
+
+  ctx.lineWidth = 0.4;
+
+  // Center of gear.
+  let p = new FPath();
+  p.ellipse(c.x,c.y,1.5,1.5,0,0,2*Math.PI);
+  ctx.fill(p);
+
+  // Point along parameterization where involute meets pitch circle.
+  let t = Math.tan(phi);
+
+  // Adjustment to width of the base of the teeth due to the fact that
+  // the teeth are of varying width. Note that the radius of the base circle
+  // doesn't matter.
+  let ipt = invo2(t);
+  let alpha = -Math.atan2(ipt.y,ipt.x);
+
+  // Determine the maximum value for t. This is the point at which the
+  // sides of a tooth meet. It determines the maximum possible value
+  // for the addendum.
+  let targetV = Math.tan(Math.PI/(2*N) + alpha);
+  let maxT = Numerical.newton(toothMeet,0.3,0,2,targetV,0.00001);
+
+  // Now the value of t determined by the addendum.
+  let T = Math.sqrt(((rp + a)/rb)**2 - 1);
+  if (T > maxT)
+    T = maxT;
+
+  // These are the parts of the gear profile. There's a tricky thing here in
+  // that the arc subtended by the top land must be determined.
+  // The arc subtended by half a tooth (out to maxT) is known to be
+  // pi/(2N) + alpha, but the involute now spans a smaller angle and the top
+  // land makes up the difference. This smaller angle is determined by
+  // invo(T), and the angle is beta such that
+  // tan(beta) = y(T)/x(T).
+  let basicInv = FPath.parametricToBezier(invo2,0,T,30);
+  let basicBot = FPath.circArcToBezier(rp-b,0,Math.PI/N - 2*alpha);
+
+  ipt = invo2(T);
+  let beta = -Math.atan2(ipt.y,ipt.x);
+  let basicTop = FPath.circArcToBezier(rp+a,0,Math.PI/N + 2*alpha - 2*beta);
+
+  // Due to LH coordinates.
+  basicTop = basicTop.reflectX();
+  basicBot = basicBot.reflectX();
+
+  // Add a radial line on each side of basicInv so that the tooth reaches
+  // the dedendum circle.
+  basicInv = basicInv.scale(rb);
+  basicInv.frontLineTo(rp-b,0);
+
+  let angle = -Math.PI / (2*N) + alpha;
+  ctx.strokeStyle='black';
+
+  for (let i = 0; i < N; i++)
+    {
+      // One side of tooth.
+      let inv = basicInv.rotate(angle);
+      inv = inv.translate(c);
+      ctx.stroke(inv);
+
+      // Arc of top land.
+      let top = basicTop.rotate(angle - beta);
+      top = top.translate(c);
+      ctx.stroke(top);
+
+      // Other side of tooth.
+      angle -= Math.PI / N + 2 * alpha;
+      inv = basicInv.reflectX();
+      inv = inv.rotate(angle);
+      inv = inv.translate(c);
+      ctx.stroke(inv);
+
+      // Gap between teeth.
+      let gap = basicBot.rotate(angle);
+      gap = gap.translate(c);
+      ctx.stroke(gap);
+
+      angle -= Math.PI / N - 2*alpha;
+    }
+}

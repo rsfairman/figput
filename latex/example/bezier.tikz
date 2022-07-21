@@ -1,0 +1,9 @@
+\begin{tikzpicture}
+\useasboundingbox (0bp,0bp) rectangle (343.71bp,175.00bp);
+\draw[line width=0.40bp] (70.00bp, 165.00bp) -- (30.00bp, 115.00bp) -- (120.00bp, 25.00bp) -- (270.00bp, 105.00bp) ;
+\draw[line width=1.50bp] (70.00bp, 165.00bp) .. controls (30.00bp, 115.00bp) and (120.00bp, 25.00bp) .. (270.00bp, 105.00bp);
+\fill (70.00bp,165.00bp) ellipse [x radius=3.00bp,y radius =3.00bp];
+\fill (30.00bp,115.00bp) ellipse [x radius=3.00bp,y radius =3.00bp];
+\fill (120.00bp,25.00bp) ellipse [x radius=3.00bp,y radius =3.00bp];
+\fill (270.00bp,105.00bp) ellipse [x radius=3.00bp,y radius =3.00bp];
+\end{tikzpicture}

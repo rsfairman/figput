@@ -1,0 +1,13 @@
+\begin{tikzpicture}
+\useasboundingbox (0bp,0bp) rectangle (343.71bp,130.00bp);
+\fill (185.36bp,70.00bp) ellipse [x radius=2.00bp,y radius =2.00bp];
+\draw[line width=2.00bp] (185.36bp, 70.00bp) -- (215.25bp, 110.08bp) ;
+\draw[line width=2.00bp] (185.36bp, 70.00bp) -- (145.28bp, 99.90bp) ;
+\draw[line width=2.00bp] (185.36bp, 70.00bp) -- (155.46bp, 29.92bp) ;
+\draw[line width=2.00bp] (185.36bp, 70.00bp) -- (225.43bp, 40.10bp) ;
+\fill (114.64bp,70.00bp) ellipse [x radius=2.00bp,y radius =2.00bp];
+\draw[line width=2.00bp] (114.64bp, 70.00bp) -- (161.32bp, 87.93bp) ;
+\draw[line width=2.00bp] (114.64bp, 70.00bp) -- (96.72bp, 116.68bp) ;
+\draw[line width=2.00bp] (114.64bp, 70.00bp) -- (67.97bp, 52.07bp) ;
+\draw[line width=2.00bp] (114.64bp, 70.00bp) -- (132.57bp, 23.32bp) ;
+\end{tikzpicture}

@@ -1,0 +1,59 @@
+  function elldraw(ctx) {
+
+  // The length of the string.
+  let k = 150;
+
+  let yaxis = 85;
+
+  // Limit these two points to be along the line y = yaxis.
+  let w1 = DraggableDotWidget.register(ctx,125,yaxis,'d1');
+  let w2 = DraggableDotWidget.register(ctx,225,yaxis,'d2');
+
+  // We need a LoopAnimWidget for an animation, even though we never want
+  // see the widget.
+  let numSteps = 1000;
+  let loopw = LoopAnimWidget.register(ctx,-100,100,1.0,
+  false, // hidden
+  numSteps, // steps per loop
+  0, // starting step
+  10, // ms time step
+  false,false,false,false,false, // nothing is visible
+  'loop');
+
+  w1.widgetY = yaxis;
+  w2.widgetY = yaxis;
+
+  // The origin is the mid-point.
+  let cx = (w1.widgetX + w2.widgetX) / 2;
+  let cy = yaxis;
+
+  // c = distance from foci to center, a = x-radius and b = y-radius.
+  let c = Math.abs(w1.widgetX - cx);
+  let a = k / 2;
+  let b = Math.sqrt(a*a - c*c);
+
+  // The ellipse
+  let p = new FPath();
+  p.ellipse(cx,cy,a,b,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 1.5;
+  ctx.stroke(p);
+
+  // An animation, based on the parameterization p(t) = (a cos(t),b sin(t)).
+  // This based on the eccentric angle, so time won't seem to be
+  // constant, but that's OK. This is easier.
+  let t = 2*Math.PI * loopw.curStep / numSteps;
+  let px = a * Math.cos(t) + cx;
+  let py = b * Math.sin(t) + cy;
+
+  p = new FPath();
+  p.moveTo(cx - c,yaxis);
+  p.lineTo(px,py);
+  p.lineTo(cx + c,yaxis);
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // In this case (unlike most others), the widgets must be explicitly drawn.
+  w1.draw(ctx);
+  w2.draw(ctx);
+}

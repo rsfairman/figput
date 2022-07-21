@@ -1,0 +1,43 @@
+function constpp(ctx) {
+
+  // A static figure, no interaction.
+  let rc = 60;
+  let rd = 40;
+  let y = 70;
+
+  let c = new Point2D(100,y);
+  let d = new Point2D(c.x + rc+rd,y);
+
+  // Pitch circles
+  let p = new FPath();
+  p.ellipse(c.x,c.y,rc,rc,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 1.5;
+  ctx.stroke(p);
+
+  p = new FPath();
+  p.ellipse(d.x,d.y,rd,rd,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 1.5;
+  ctx.stroke(p);
+
+  // Base circles
+  let s = 0.80;
+  p = new FPath();
+  p.ellipse(c.x,c.y,s*rc,s*rc,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  p = new FPath();
+  p.ellipse(d.x,d.y,s*rd,s*rd,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  ctx.font = '10px san-serif';
+  ctx.fillStyle = 'black';
+
+  drawText(ctx,'base circle', c.x,c.y,-4,0);
+  drawText(ctx,'pitch circle', d.x,c.y+rd+6,0,0);
+}

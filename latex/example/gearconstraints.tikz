@@ -1,0 +1,7 @@
+\begin{tikzpicture}
+\useasboundingbox (0bp,0bp) rectangle (343.71bp,120.00bp);
+\draw[line width=0.40bp] (250.00bp,40.00bp) ellipse [x radius=5.00bp,y radius =5.00bp];
+\draw[line width=2.00bp] (265.00bp, 40.00bp) .. controls (265.00bp, 65.00bp) and (260.00bp, 100.00bp) .. (235.00bp, 100.00bp).. controls (231.00bp, 100.00bp) and (165.00bp, 100.00bp) .. (165.00bp, 80.00bp).. controls (165.00bp, 77.00bp) and (165.00bp, 60.00bp) .. (205.00bp, 60.00bp).. controls (225.00bp, 60.00bp) and (235.00bp, 60.00bp) .. (235.00bp, 40.00bp).. controls (235.00bp, 32.00bp) and (242.00bp, 25.00bp) .. (250.00bp, 25.00bp).. controls (267.00bp, 25.00bp) and (265.00bp, 50.00bp) .. (265.00bp, 40.00bp);
+\draw[line width=0.40bp] (30.00bp,20.00bp) ellipse [x radius=5.00bp,y radius =5.00bp];
+\draw[line width=2.00bp] (32.49bp, 8.26bp) .. controls (42.28bp, 10.34bp) and (169.44bp, 37.37bp) .. (179.22bp, 39.45bp).. controls (185.09bp, 40.70bp) and (189.71bp, 47.81bp) .. (188.46bp, 53.68bp).. controls (187.21bp, 59.55bp) and (180.10bp, 64.17bp) .. (174.23bp, 62.92bp).. controls (168.36bp, 61.68bp) and (33.37bp, 32.99bp) .. (27.51bp, 31.74bp).. controls (21.64bp, 30.49bp) and (17.01bp, 23.37bp) .. (18.26bp, 17.51bp).. controls (19.51bp, 11.64bp) and (26.63bp, 7.01bp) .. (32.49bp, 8.26bp);
+\end{tikzpicture}

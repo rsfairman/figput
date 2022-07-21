@@ -1,0 +1,50 @@
+function teethtouch(ctx) {
+
+  let c = new Point2D(100,20);
+  let rb = 80;
+
+  // Bit of arc on the right. This is the base circle.
+  let span = Math.PI/5;
+  let p = FPath.circArcToBezier(rb,0,span);
+  //p = p.reflectX();
+  p = p.translate(c);
+  ctx.lineWidth = 1.0;
+  ctx.stroke(p);
+
+  // And a slightly larger arc for the pitch circle.
+  let rp = rb + 22;
+  p = FPath.circArcToBezier(rp,0,span);
+  //p = p.reflectX();
+  p = p.translate(c);
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // Draw x-axis/radius.
+  let width = 150
+  p = new FPath();
+  p.moveTo(c.x,c.y);
+  p.lineTo(c.x+width,c.y);
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // Using the earlier invo2() function for the unit involute.
+  let a = Math.PI/8;
+  let inv = FPath.parametricToBezier(invo2,0,1.5,30);
+  p = inv.reflectX();
+  //p = inv.scale(rb);
+  p = p.scale(rb);
+  p = p.translate(c);
+  ctx.stroke(p);
+
+  // And a line out to the point where the top involute meets the pitch circle.
+  p = new FPath();
+  p.moveTo(c.x,c.y);
+  let t = Math.sqrt((rp/rb)**2 - 1);
+  let q = invo2(t);
+  q = new Point2D(q.x,-q.y);
+  q = new Point2D(q.x*rb,q.y*rb);
+  q = new Point2D(q.x+c.x,q.y+c.y);
+  p.lineTo(q.x,q.y);
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+}

@@ -1,0 +1,269 @@
+function badspokegear(ctx) {
+
+  // Two gear-like pinwheels, where the one on the right drives the one on
+  // the left. The idea is to show how the rotation surges, and why something
+  // like involvolute gears are needed.
+  //
+  // Modeling this is surprisingly fiddly. There's no need to make this
+  // fully general, for all possible arrangements, and it's not too bad
+  // if we restrict things a bit.
+  //
+  // In general (too general), suppose that the two sets of spokes have
+  // lengths R1 and R2. Think of the gear on the right driving the
+  // gear on the left, with the gear on the right rotating ccw (under the
+  // usual RH coordinate system). WLOG, assume that the two axles are on the
+  // x-axis. We want to know where the two spokes initially touch "at
+  // the top," but it's actually easier to figure out where the last touch
+  // "at the bottom."
+  //
+  // To simplify, assume that all spokes (on both gears) have the same
+  // length, R. And assume that the centers of these gears are at
+  // (-x,0) and (x,0) so that the centers are 2x appart. Obviously, R > x
+  // for the gears to mesh at all.
+  //
+  // Since the spokes are all the same length, it's easy to see that
+  // The angle of the RH spoke at the top is alpha above the x-axis when
+  // the spokes initally touch, and alpha below the x-axs when they cease
+  // to touch. Here, alpha is defined by
+  // cos(alpha) = x/R.
+  //
+  // Furthermore, let delta be the angle from spoke to spoke, so the
+  // number of spokes is 2 pi / delta. Assume that both gears have the
+  // same number of spokes. Note that delta must be less than 2 alpha
+  // for the spokes to always be in contact. Ideally, I want delta to be
+  // large enough so that no more than one pair of spokes (one on left and
+  // on on right) is ever in contact. Otherwise, it's more messy since
+  // you'd have to figure out which pair of spokes is doing the driving.
+  // In fact, it looks like I want delta = 2 alpha, or to put it another
+  // way, given delta, it follows that alpha = delta / 2.
+  //
+  // Now, think about what happens as the point of contact goes from the
+  // top, where the spoke barely touch, downward. The point of contact
+  // stays on the top of the left spoke and slides down on the right spoke.
+  // What you have is a triangle on the left with hypoteneuse R, and a
+  // triangle on the right with hypoteneuse r. We need to determine r.
+  // Let beta be the angle of the right spoke above the x-axis. beta
+  // grows linearly with time, and is fully known...actually, beta
+  // *shrinks* if we think of it as the angle of the right spoke above
+  // the x-axis.
+  //
+  // Let c be the x-coordinate of the point of contact, and let x1 be
+  // the distance from c to -x (the left axle) and x2 be the distance
+  // from c to +x (the right axle). We must have
+  // R^2 - x1^2 = r^2 - x2^2
+  // since the left and right triangles share the same vertical leg.
+  // And x1 + x2 = 2x by construction. The third equation we need
+  // is cos(beta) = x2/r or x2 = r cos(beta).
+  //
+  // Solve these three equations for x1, x2 and r in terms of R and x.
+  // First, use x1 = 2x - x2. Substitute:
+  // R^2 - x1^2 = r^2 - x2^2
+  // R^2 - (2x-x2)^2 = r^2 - x2^2
+  // R^2 - 4x^2 + 4x*x2 - (x2)^2 = r^2 - x2^2
+  // R^2 - 4x^2 + 4x*x2 = r^2
+  //
+  // Now use x2 = r cos(beta) and use C = cos(beta) for brevity:
+  // R^2 - 4x^2 + 4x*x2 = r^2
+  // R^2 - 4x^2 + 4x*(rC) = r^2
+  // r^2 - 4Cx r + 4x^2 - R^2 = 0.
+  // Solve for r by quadatic equation:
+  // r = (1/2) [ 4Cx \pm \sqrt{ 16C^2x^2 - 4(4x^2-R^2) } ]
+  // r = 2Cx \pm \sqrt{ 4C^2x^2 - 4x^2+ R^2 }
+  // r = 2Cx \pm \sqrt{ 4x^2(cos^2(beta) - 1 ) + R^2 }
+  // r = 2Cx \pm \sqrt{ -4x^2 sin^2(beta) + R^2 }
+  //
+  // Aside: note that the discriminant is always postive since R > x.
+  // I'm not sure what the two solutions here might "mean."
+  //
+  // This tells us what is going on from the point when the spokes touch
+  // at the top until you reach the point where they are aligned along the
+  // x-axis. However, we need the angle on the left -- that was the
+  // whole point. We have angle beta on the right, and we want to know
+  // the angle, gamma, on the left.
+  //
+  // We have cos(gamma) = x1/R, where gamma is measured upwards from the
+  // x-axis to the spoke in contact on the left gear (like normal).
+  //
+  // Now do something similar as the point of contact goes below the
+  // x-axis. It's the same basic calculation, except that the tip of the
+  // right spoke is in contact somewhere along the left spoke.
+  // Left and right are reversed.
+  //
+  // We still have x1 + x2 = 2x but now R^2 - x2^2 = r^2 - x1^2, and
+  // cos(beta) = x2/R. It's the same basic game. We get.
+  //
+  // R^2 + 4x^2 - 4x*x2 = r^2
+  // just as before. But now use x2 = R cos(beta) (R, not r) and it's
+  // a simpler problem:
+  // R^2 - 4x^2 + 4x*x2 = r^2
+  // R^2 - 4x^2 + 4x R cos(beta) = r^2
+  // becomes
+  // r = \pm\sqrt{ R^2 - 4x^2 + 4x R cos(beta) }
+  //
+  // BUG: The calculation above treats the spokes as geometric lines, with zero
+  // thickness. Ideally, I should take the width of the lines into account.
+
+  // The presence of this widget means that this is an animation.
+  // The code here will be called on a regular schedule.
+  let stepsPerRev = 500;
+  let startStep = 0;
+  let timeStep = 20;
+
+  let w = LoopAnimWidget.register(ctx,
+    -LoopAnimWidget.Radius,LoopAnimWidget.Radius + LoopAnimWidget.TopHeight,0.75,
+    true,stepsPerRev,startStep,timeStep,
+    true,true,true,true,true,"wigname");
+
+  // BUG: I messed up when I wrote this and inadvertantly did all the
+  // measurements to the wrong scale. Thus, I have to undo my mistake.
+  // The real fix is to change all the constants below so that this
+  // scale() isn't necessary.
+  let mistakeT = ctx.getTransform();
+  ctx.scale(0.5,0.5);
+
+  // The two gears are on opposite sides of this vertical line.
+  let xZero = 300;
+
+  // You can change the number of teeth, but the surging is most apparent
+  // with four teeth (which is the minimum geometrically possible given
+  // the algebra. Somewhere around 6 or 7 teeth it becomes hard to see.
+  // BUG: five teeth generates some kind of "jump" in the animation.
+  // Not sure why.
+  let numTeeth = 4;
+  let spokeLength = 100;
+
+  // The angle between spokes.
+  let delta = 2*Math.PI/numTeeth;
+
+  // Spoke radius and thickness.
+  let R = spokeLength;
+  let spokeWidth = 2;
+
+  // Distance of each spoke axis from the center line.
+  // I want the top pair of spokes to make contact at the same instant
+  // that the bottom pair of spokes ceases contact. That requires
+  let x = R * Math.cos(delta/2);
+
+  // Draw the spokes on the right. These are the drivers, so the angle rises
+  // linearly with time.
+  let cx = (xZero + x);
+  let cy = 140;
+
+  var path1 = new FPath();
+
+  // A dot at the center, probably not necessary.
+  path1.ellipse(cx,cy,2.0*spokeWidth,2.0*spokeWidth,0,0,2*Math.PI);
+  ctx.fill(path1);
+
+  // Angle by which the gear has rotated, based on the step of the animation.
+  let rotA = w.curStep * 2 * Math.PI / stepsPerRev;
+
+  for (let i = 0; i < numTeeth; i++)
+    {
+      path1 = new FPath();
+
+      let angle = i*delta + rotA;
+      while (angle < 0)
+        angle += 2 * Math.PI;
+      while (angle > 2*Math.PI)
+        angle -= 2 * Math.PI;
+
+      path1.moveTo(cx,cy);
+      let x = cx + R * Math.cos(angle);
+      let y = cy + R * Math.sin(angle);
+      path1.lineTo(x,y);
+
+      ctx.strokeStyle = "black";
+      ctx.lineWidth = spokeWidth;
+      ctx.stroke(path1);
+    }
+
+  // Now the left, driven, set of spokes.
+  cx = (xZero - x);
+
+  // Figure out which of the spokes on the right gear is the one in contact
+  // and doing the driving. It's the one whose angle relative to the
+  // x-axis is between delta/2 above and delta/2 below the axis.
+  // To put it another way, its angle is in the range pi\pm delta/2.
+  // This could have been noted in the loop above.
+  let contactAngle = 0.0;
+  for (let i = 0; i < numTeeth; i++)
+    {
+      let angle = i*delta + rotA;
+      while (angle < 0)
+        angle += 2 * Math.PI;
+      while (angle > 2*Math.PI)
+        angle -= 2 * Math.PI;
+
+      if ((angle < Math.PI + delta/2) && (angle > Math.PI - delta/2))
+        {
+          contactAngle = angle;
+          break;
+        }
+    }
+
+  // contactAngle is the angle of the right gear's "contact spoke," but
+  // measured from the right. I want beta (in the notation above), measured
+  // from the left side, to put it in the range [-delta/2,+delta/2].
+  contactAngle = Math.PI - contactAngle;
+
+  var gamma = 0;
+  if (contactAngle >= 0)
+    {
+      // The point of contact is above the x-axis. Slightly messier case.
+      let beta = contactAngle;
+      let disc = R*R - 4*x*x*Math.sin(beta)*Math.sin(beta);
+      let root = Math.sqrt(disc);
+
+      // Conceptually, I'm not sure why, but this seems to be the right
+      // choice -- minus, not plus.
+      let r = 2 * Math.cos(beta) * x - root;
+
+      let x2 = r * Math.cos(beta);
+      let x1 = 2 * x - x2;
+
+      // I didn't address this in the long comment above, but
+      // (x1,sqrt(R^2-x1^2)) is the end-point of the left spoke in
+      // contact with the right spoke. The angle for this spoke is thus
+      // gamma, where cos(gamma) = x1/R.
+      gamma = Math.acos(x1/R);
+    }
+  else
+    {
+      // The point of contact is below the x-axis, hence the minus to
+      // make beta positive.
+      let beta = -contactAngle;
+      let disc = R*R + 4*x*x - 4*x*R*Math.cos(beta);
+      let r = Math.sqrt(disc);
+
+      let x2 = R * Math.cos(beta);
+      let x1 = 2 * x - x2;
+
+      gamma = 2*Math.PI - Math.acos(x1/r);
+    }
+
+  // A dot at the center, probably not necessary.
+  path1 = new FPath();
+  path1.ellipse(cx,cy,2.0*spokeWidth,2.0*spokeWidth,0,0,2*Math.PI);
+  ctx.fill(path1);
+
+  // Draw the left spokes, based on gamma.
+  rotA = -w.curStep * 2 * Math.PI / stepsPerRev;
+
+  for (let i = 0; i < numTeeth; i++)
+    {
+      path1 = new FPath();
+
+      path1.moveTo(cx,cy);
+      let x = cx + R * Math.cos(i*delta + gamma);
+      let y = cy + R * Math.sin(i*delta + gamma);
+
+      path1.lineTo(x,y);
+
+      ctx.lineWidth = spokeWidth;
+      ctx.stroke(path1);
+    }
+
+  // BUG: Undo the above fix of my scaling mistake.
+  ctx.setTransform(mistakeT);
+}

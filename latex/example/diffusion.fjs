@@ -1,0 +1,150 @@
+function diffusion(ctx) {
+
+  // This is an open-ended animation.
+  let wanim = OpenAnimWidget.register(ctx,50,-32,1.0,
+    200, // horizontal size
+    true, // visible
+    10, // time step (ms)
+    10000, // decay
+    false, // steps not visible
+    true, // fast/slow visible
+    true, // pause/run visible
+    true, // time bar visible
+    false, // time bar not grabable.
+    'anim');
+
+  // A button for removing the divider.
+  let wbut = ButtonWidget.register(ctx,-85,32,'Open/Restart','but');
+
+  // Draw the enclosing box.
+  let p = new FPath();
+  p.moveTo(1,2);
+  p.lineTo(300,2);
+  p.lineTo(300,178);
+  p.lineTo(1,178);
+  p.closePath();
+  ctx.lineWidth = 3;
+  ctx.fillStyle = 'black';
+  ctx.strokeStyle = 'black';
+  ctx.stroke(p);
+
+  // These define the box for the particles.
+  let boxleft = 5;
+  let boxright = 150;
+  let boxbot = 4;
+  let boxtop = 175;
+  let boxdivider = 145;
+
+  if ((diffusion.started === undefined) || (wbut.resetState === true))
+    {
+      wbut.resetState = false;
+      wanim.curStep = 0;
+
+      // Allocate 100 dots in the left half of the box.
+      // Each needs a position and direction.
+      diffusion.pos = [];
+      diffusion.dir = [];
+      for (let i = 0; i < 100; i++)
+        {
+          // Position
+          let r = Math.random();
+          let x = boxleft + r*(boxdivider - boxleft - 4);
+
+          r = Math.random();
+          let y = boxbot + r*(boxtop-boxbot)
+          diffusion.pos.push({x: x, y: y});
+
+          // Direction vector. Say each is evenly distributed over
+          // (0,1). That is not physically correct, but that's OK.
+          // To make this better, consider how the balls could bounce
+          // off of each other. That's messy, so I let them pass
+          // through one another, and only consider bouncing off walls.
+          let vx = (Math.random() - 0.50) / 2.0 ;
+          let vy = Math.sqrt(0.25*0.25 - vx*vx);
+          if (Math.random() > 0.50)
+            vy *= -1;
+
+          // Don't let either value be too small. It looks weird.
+          if (Math.abs(vx) < 0.05)
+            {
+              if (vx < 0.0)
+                vx = -0.05;
+              else
+                vx = 0.05;
+            }
+          if (Math.abs(vy) < 0.05)
+            {
+              if (vy < 0.0)
+                vy = -0.05;
+              else
+                vy = 0.05;
+            }
+
+          diffusion.dir.push({x: vx, y: vy});
+        }
+
+      diffusion.started = true;
+    }
+
+    // As noted, we only consider bouncing off walls. Assume that a ball
+    // moves from it's old position to new by the dir vector with each
+    // time step. If that would take the ball outside the rectangle, then
+    // we must consider reflection.
+    let dotR = 3;
+
+    // Draw the "wall" if it's closed.
+    if (wbut.clickState === false)
+      {
+        p = new FPath();
+        p.moveTo(boxdivider,2);
+	p.lineTo(boxdivider,boxtop + 2);
+	ctx.lineWidth = 3;
+	ctx.stroke(p);
+      }
+
+    // This depends on whether the wall is up.
+    let rightEdge = boxdivider - 3;
+
+    if (wbut.clickState === true)
+      rightEdge = 299;
+
+    for (let i = 0; i < diffusion.pos.length; i++)
+      {
+        let pold = diffusion.pos[i];
+        let vold = diffusion.dir[i];
+
+        let pnew = {x: pold.x + vold.x, y: pold.y + vold.y};
+        //console.log(i+ ' ' +pnew.y);
+        if (pnew.y < boxbot)
+          {
+            // Bounced off top edge.
+            // If each step takes 1 unit of time, then it hit the edget at
+            // Actually... be sloppy. I'm not really doing physics; I just
+            // want to demonstrate the FigPut system.
+            // The balls are moving slowly, so only allow them to reflect
+            // at the time of the step divisions.
+            diffusion.dir[i].y *= -1;
+          }
+          if (pnew.y > boxtop)
+            {
+              // Bottom edge bounce.
+              diffusion.dir[i].y *= -1;
+            }
+          if (pnew.x < boxleft)
+            // Left edge bounce.
+            diffusion.dir[i].x *= -1;
+          if (pnew.x > rightEdge - 2)
+            // Right edge bounce.
+            diffusion.dir[i].x *= -1;
+
+        // Redo, after taking reflections into account.
+        vold = diffusion.dir[i];
+        pnew = {x: pold.x + vold.x, y: pold.y + vold.y};
+
+        diffusion.pos[i] = pnew;
+
+        p = new FPath();
+        p.ellipse(pnew.x,pnew.y,dotR,dotR,0,0,2*Math.PI);
+        ctx.fill(p);
+      }
+}

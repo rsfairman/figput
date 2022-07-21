@@ -1,0 +1,147 @@
+function gearconstraints(ctx) {
+
+  // A static figure. No widgets.
+  //
+  // I wrote this before I changed the framework to assume a RH coordinates
+  // system. Instead of messing around changing the values below, each path
+  // is reflected and translated, much like a transformation matrix.
+
+  // Cam center.
+  let cax = 250;
+  let cay = 80;
+  let ra = 5;
+
+  let p = new FPath();
+  p.ellipse(cax,cay,ra,ra,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 0.4;
+
+  p = p.reflectX();
+  p = p.translate(new Point2D(0,120));
+
+  ctx.stroke(p);
+
+  // Cam itself
+
+  // Right upper
+  let cs = 15; // space to right of axis
+  let h1 = 60; // height above
+  let tan1 = 25; // tightness of tangents
+  let tan2 = 25;
+
+  p = new FPath();
+  p.moveTo(cax+cs,cay);
+  p.bezierCurveTo(cax+cs,cay - tan1,
+    cax-cs + tan2,cay-h1,
+    cax-cs,cay-h1);
+
+  // left upper
+  let h2 = 70; // how far left
+  let t1 = 20; // thickness of arm
+  tan1 = 4;
+  tan2 = 3;
+  p.bezierCurveTo(cax-cs-tan1,cay - h1,
+    cax-cs - h2,cay - h1,
+    cax-cs - h2,cay - h1 + t1);
+
+  // Lower left
+  let h3 = 40; // how far back right
+  p.bezierCurveTo(cax-cs-h2,cay - h1 + t1 + tan2,
+    cax-cs - h2,cay - h1 + 2*t1,
+    cax-cs - h2 + h3,cay - h1 + 2*t1);
+
+  // Inner concave
+  tan1 = 20;
+  tan2 = 20;
+  p.bezierCurveTo(cax-cs-h2 + h3 + tan1,cay - h1 + 2*t1,
+    cax-cs,cay - tan2,
+    cax-cs,cay);
+
+  // lower left below
+  tan1 = 8;
+  tan2 = 8;
+  p.bezierCurveTo(cax-cs,cay + tan1,
+    cax-tan2,cay + cs,
+    cax,cay+cs);
+
+  // lower right below
+  // BUG: It's hard to get these curves to meet smoothly. Need a better 'close'.
+  tan1 = 17;
+  tan2 = 10;
+  p.bezierCurveTo(cax + tan1,cay + cs,
+    cax + cs,cay - tan2,
+    cax + cs,cay);
+
+  ctx.lineWidth = 2.0;
+
+  p = p.reflectX();
+  p = p.translate(new Point2D(0,120));
+
+  ctx.stroke(p);
+
+  // Now something similar for the long arm.
+  // The easiest way to do this is to draw it horizontal, but rotate all the
+  // points by some angle so that the arm touches the cam.
+  cax = 30
+  cay = 100;
+
+  p = new FPath();
+  p.ellipse(cax,cay,ra,ra,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 0.4;
+
+  p = p.reflectX();
+  p = p.translate(new Point2D(0,120));
+
+  ctx.stroke(p);
+
+  // top right
+  cs = 12; // half thickness
+  let L = 150; // length
+
+  p = new FPath();
+  tan1 = 10;
+  tan2 = 10;
+  p.moveTo(cax,cay + cs);
+  p.bezierCurveTo(cax + tan1,cay + cs,
+    cax + L - tan2,cay +cs,
+    cax + L,cay + cs);
+
+  // lower right
+  tan1 = 6;
+  tan2 = 6;
+  p.bezierCurveTo(cax + L + tan1,cay +cs,
+    cax + L + cs,cay + tan2,
+    cax + L + cs,cay);
+
+  // upper right
+  p.bezierCurveTo(cax + L + cs,cay - tan1,
+    cax + L + tan2,cay - cs,
+    cax + L,cay - cs);
+
+  // top
+  p.bezierCurveTo(cax + L - tan1,cay - cs,
+    cax + tan2,cay - cs,
+    cax,cay - cs);
+
+  // upper left
+  p.bezierCurveTo(cax - tan1,cay - cs,
+    cax - cs,cay - tan2,
+    cax - cs,cay);
+
+  // lower left to close
+  p.bezierCurveTo(cax - cs,cay + tan1,
+    cax - tan2,cay + cs,
+    cax,cay + cs);
+
+  // Rotate the entire thing
+  let a = -12 * Math.PI / 180; // angle to rotate
+  let p2 = p.rotateAbout(a,new Point2D(cax,cay));
+
+  ctx.lineWidth = 2.0;
+
+  p2 = p2.reflectX();
+  p2 = p2.translate(new Point2D(0,120));
+
+  ctx.stroke(p2);
+}

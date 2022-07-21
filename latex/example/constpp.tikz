@@ -1,0 +1,9 @@
+\begin{tikzpicture}
+\useasboundingbox (0bp,0bp) rectangle (343.71bp,140.00bp);
+\draw[line width=1.50bp] (100.00bp,70.00bp) ellipse [x radius=60.00bp,y radius =60.00bp];
+\draw[line width=1.50bp] (200.00bp,70.00bp) ellipse [x radius=40.00bp,y radius =40.00bp];
+\draw[line width=0.40bp] (100.00bp,70.00bp) ellipse [x radius=48.00bp,y radius =48.00bp];
+\draw[line width=0.40bp] (200.00bp,70.00bp) ellipse [x radius=32.00bp,y radius =32.00bp];
+\node [anchor=base west] at (96.00pt, 70.00pt) {base circle};
+\node [anchor=base west] at (200.00pt, 116.00pt) {pitch circle};
+\end{tikzpicture}

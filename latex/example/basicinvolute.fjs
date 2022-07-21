@@ -1,0 +1,180 @@
+// An extra function to define the involute.
+function invo(t) {
+
+  // Basically, if you have a circle of radius a, the parametric form is
+  // x(t) = a (cos t + t sin t)
+  // y(t) = a (sin t - t cos t)
+  // The parameterization starts with t = 0, then runs as an angle in radians.
+
+  // These values copied from below.
+  let cx = 160;
+  let cy = 52;
+  let a = 50;
+
+  let c = Math.cos(t);
+  let s = Math.sin(t);
+
+  return new Point2D( cx + a*(c + t*s), cy + a*(s - t*c));
+}
+
+function basicinvolute(ctx) {
+
+  // A looping animation that draws an involute. The string unwraps
+  // and re-wraps in a loop. Note the doubling of numSteps since I
+  // want back-and-forth action.
+  let numSteps = 100;
+  let loopw = LoopAnimWidget.register(ctx,-30,55,0.85,
+  true, // visible
+  2*numSteps, // steps per loop
+  0, // starting step
+  20, // ms time step
+  //false,false,false,false,false, // nothing is visible
+  true,true,true,true,true, // Everything visible
+  'loop');
+
+  let cx = 160;
+  let cy = 52;
+  let r = 50;
+
+  // circle
+  let p = new FPath();
+  p.ellipse(cx,cy,r,r,0,0,2*Math.PI);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 0.4;
+  ctx.stroke(p);
+
+  // And a dot at the center.
+  p = new FPath();
+  p.ellipse(cx,cy,2,2,0,0,2*Math.PI);
+  ctx.fillStyle = 'black';
+  ctx.fill(p);
+
+  // Draw the involute by converting to a bezier.
+  // The level of ``unwrap'' is determined by the number of steps of
+  // the animation.
+  let t = 2 * Math.abs((loopw.curStep - numSteps) / numSteps);
+  let segs = Math.ceil(15 * t);
+  p = FPath.parametricToBezier(invo,0,t,segs);
+  ctx.lineWidth = 1.2;
+  ctx.stroke(p);
+
+  // The string goes from the end of the involute to a point tangent
+  // to the circle. So, I have a circle centered at
+  // (c_x,c_y) and a point p = (p_x,p_y) = end-point of involute, and
+  // I want the point on the circle such that the line from the point on
+  // the circle to p is tangent to the circle. The circle is parameterized
+  // by (c_x,c_y) + r(cos a,sin a), (a varies) so the tangent to the circle is
+  // parameterized by r(-sin a,cos a). I need such a tangent vector that points
+  // to p. Let t(a) = r(-sin a,cos a) and c(a) = r(cos a,sin a). I need to
+  // find a such that c(a) + s t(s) = p, for some s. Thus, I need to solve
+  // (c_x + r cos a - s r sin a,c_y + r sin a + s r cos a) = (p_x,p_y)
+  // for a and s (although I don't really care about s). We have
+  // c_x + r cos a - s r sin a = p_x implies
+  // s = ( c_x + r cos a - p_x) / r sin a
+  // Plugging into the other coordinate, we get
+  // p_y = c_y + r sin a + s r cos a
+  // p_y = c_y + r sin a + r cos a ( c_x + r cos a - p_x) / r sin a
+  // p_y = c_y + r sin a + cos a ( c_x + r cos a - p_x) / sin a
+  //
+  // BLAH. That is a mess. Easier is to do it by construction.
+  // We have a circle centered at C and a point P. Let D be the midpoint
+  // of line line CP. The circle about D passing through C and P meets the
+  // circle around C at two points, E and F. The line from C to E (or to F)
+  // is a right angle since the angle is ``inscribed'' in the circle about D.
+  // This is a general fact, that if you take two points that are opposite
+  // each other in a circle (C and P in my example) and *any* other point
+  // on that circle, then the angle formed by the two opposite points and
+  // that other point is a right angle.
+  // If that is a right angle, then the line from P to E (or to F) is tangent
+  // to the circle.
+  //
+  // Moral of the story...We have circle centered at (c_x,c_y) and p=(p_x,p_y),
+  // the end-point of involute. The line from p tangent to the circle is
+  // obtained by defining d=(d_x,d_y) as the midpoint of c and p. The
+  // intersection of the circle around d with the circle around c is the
+  // point in question.
+  //
+  // I've reduced to the problem of finding the points of intersection of two
+  // circles. We have
+  // (x-c_x)^2 + (y-c_y)^2 = r_c^2
+  // (x-d_x)^2 + (y-d_y)^2 = r_d^2
+  // Subtract the second from the first to obtain
+  // (x-c_x)^2 - (x-d_x)^2 + (y-c_y)^2 - (y-d_y)^2 = r_c^2 - r_d^2
+  // Expand and collect:
+  // x^2-2xc_x+c_x^2 - x^2+2xd_x-d_x^2 + y^2-2yc_y+c_y^2 - y^2+2yd_y-d_y^2 =
+  //     r_c^2 - r_d^2
+  // -2xc_x+c_x^2 +2xd_x-d_x^2 - 2yc_y+c_y^2 +2yd_y-d_y^2 = r_c^2 - r_d^2
+  // 2x(d_x-c_x) + 2y(d_y-c_y) + c_x^2 -d_x^2 +c_y^2 -d_y^2 = r_c^2 - r_d^2
+  // 2x(d_x-c_x) + 2y(d_y-c_y) = (r_c^2-r_d^2) + (c_x^2-d_x^2) + (c_y^2 -d_y^2)
+  // Solve for y (say):
+  // y = x(c_x-d_x) / 2(d_y-c_y) +
+  //    [ (r_c^2-r_d^2) + (c_x^2-d_x^2) + (c_y^2 -d_y^2) ] / 2(d_y-c_y)
+  // and plug this back into the original equation for the circle and you
+  // can solve for x. First, write the above eqn for y as
+  // y = x(c_x-d_x) / D + r_m / D
+  //   = [ x(c_x-d_x) + r_m ] / D
+  // where r_m means ``r-mess'' and D is for ``denominator.''
+  // (x-c_x)^2 + (y-c_y)^2 = r_c^2
+  // (x-c_x)^2 + [ ( x(c_x-d_x)+ r_m ) / D - c_y ]^2 = r_c^2
+  // (x-c_x)^2 + ( x(c_x-d_x)+ r_m )^2 / D^2 - c_y ]^2 = r_c^2
+  // Etc. In theory, this is a quadratic in x, but wow.
+  //
+  // That is another mess. Back up a bit, and consider the general case
+  // of the intersection of two circles, c and d.
+  // Let D = distance between centers and P be the point of intersection.
+  // Draw a line between the centers and two triangles, one from center c to
+  // P and then perpendicular to the line betwene centers, and the other
+  // triangle similar, but in circle d. Let E be the point where the
+  // perpendicular leg of the triangles intersects the line between centers.
+  // We have distances a and b, a from center of C to E, and b from center
+  // of d to E. Let h be the height of this perpendicular leg. We have
+  // D = a + b, a^2 + h^2 = r_c^2 and b^2 + h^2 = r_d^2. Solve for a and b.
+  // This is really the same is the big messy thing, but easier to follow.
+  //
+  // FORGET ABOUT THE ABOVE. THIS IS THE WAY TO DO IT.
+  // Back way up to the very begining and reconsider the whole thing with
+  // simpler assuptions. Suppose that the circle is centered at the origin,
+  // so we can ignore (c_x,c_y). Assume also that the point is on the
+  // x-axis so that p = (p_x,p_y) = (p_x,0). Now the circle is
+  // C(a) = r (cos a, sin a)
+  // C'(a) = r (-sin a, cos a).
+  // We want the line through C(a) pointing in the C'(a) direction to
+  // pass through p. That is, we require a solution (in t and a) to
+  // C(a) + t C'(a) = p
+  // r cos a - r t sin a = p_x and r sin a + r t cos a = 0.
+  // So t = - sin a / cos a = - tan a. Then
+  // r cos a + r sin^2 a / cos a = p_x
+  // r cos^2a + r sin^2 a = p_x cos a
+  // r = p_x cos a
+  // THAT we can solve for a. We get this solution, but then have to shift
+  // and rotate. Rotate the entire plane by the angle that p is relative to
+  // the x-axis. Then shift to move the origin of the circle to (c_x,c_y).
+  //
+  // BUG: This entire mess belongs in some geometry module, preferably with
+  // a complete discussion of the math.
+
+  let P = invo(t);
+
+  // This is p_x in the analysis above.
+  let Pd = Math.sqrt((P.x - cx)**2 + (P.y - cy)**2);
+
+  // There are two possible solutions for r = p_x cos a or
+  let a = Math.acos(r/Pd);
+
+  // Now have a solution that's valid for P on the x-axis. Rotate (Pd,0) to P.
+  // This has the effect of rotating C(a) (with the a just determined this
+  // would be the tangent point if P were on the x-axis and C were centered
+  // at the origin) through an angle b, determined by tan b = P_x/P_y.
+  // But we want this relative to (cx,cy), so shift.
+  let b = Math.atan2(P.y-cy,P.x-cx);
+
+  // The point we want is now C(a+b), then translated by (cx,cy).
+  let E = new Point2D(r*Math.cos(a+b)+cx,r*Math.sin(a+b)+cy);
+
+  p = new FPath();
+  p.moveTo(P.x,P.y);
+  p.lineTo(E.x,E.y);
+  ctx.lineWidth = 0.8;
+  ctx.stroke(p);
+
+}

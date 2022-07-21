@@ -1,0 +1,72 @@
+function gearexample(ctx) {
+
+  // Note that I may have written this for a LH coordinate system, but
+  // it doesn't matter since it's radially symmetric.
+
+  // Pressure angle, number of teeth and module.
+  let phi = 20 * Math.PI / 180;
+  let N = 15;
+  let m = 5;
+
+  let c = new Point2D(175,60);
+  let pitchDiam = N * m;
+
+  // Pitch radius and base radius.
+  let rp = pitchDiam / 2;
+  let rb = rp * Math.cos(phi);
+
+  ctx.lineWidth = 0.4;
+
+  // Point along parameterization where involute meets pitch circle.
+  let t = Math.tan(phi);
+
+  // Adjustment to width of the base of the teeth due to the fact that
+  // the teeth are of varying width. Note that the radius of the base circle
+  // doesn't matter.
+  let ipt = invo2(t);
+  let alpha = -Math.atan2(ipt.y,ipt.x);
+
+  ctx.lineWidth = 0.4;
+
+  // Each tooth, at the base, takes 2pi/2N + 2 alpha. The space between
+  // teeth is 2pi/2N - 2 alpha
+  //
+  // We want the x-axis to split a gap between teeth, so the first tooth
+  // starts at (pi/N - 2 alpha) / 2 = pi/2N - alpha.
+  //
+  // Using earlier function for the unit involute.
+  // Note that the angles are all backwards (reversed sign) due to LH coords.
+
+  let basicInv = FPath.parametricToBezier(invo2,0,1,30);
+  let basicArc = FPath.circArcToBezier(rb,0,Math.PI/N - 2*alpha);
+  basicArc = basicArc.reflectX();
+
+  let angle = -Math.PI / (2*N) + alpha;
+  ctx.strokeStyle='black';
+
+  for (let i = 0; i < N; i++)
+    {
+      // One side of tooth.
+      let inv = basicInv.rotate(angle);
+      inv = inv.scale(rb);
+      inv = inv.translate(c);
+      ctx.stroke(inv);
+
+      // Other side of tooth.
+      angle -= Math.PI / N + 2 * alpha;
+      inv = basicInv.reflectX();
+      inv = inv.rotate(angle);
+      inv = inv.scale(rb);
+      inv = inv.translate(c);
+      ctx.stroke(inv);
+
+      // Gap between teeth.
+      let gap = basicArc.rotate(angle);
+      gap = gap.translate(c);
+      //ctx.strokeStyle='blue';
+      ctx.stroke(gap);
+
+      angle -= Math.PI / N - 2*alpha;
+    }
+}
+

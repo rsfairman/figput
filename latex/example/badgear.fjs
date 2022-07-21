@@ -1,0 +1,83 @@
+function badgear(ctx) {
+
+  var path1 = new FPath();
+
+  let numTeeth = 17;
+  let cx = 70;
+  let cy = 65;
+  let inR = 40;
+  let outR = 50;
+
+  path1 = new FPath();
+
+  // A dot at the center.
+  path1.ellipse(cx,cy,2,2,0,0,2*Math.PI);
+  ctx.fillStyle = 'black';
+  ctx.fill(path1);
+
+  // The teeth of the gear.
+  path1 = new FPath();
+
+  // One degree, in radians, then 360 and 180 degrees.
+  let d = Math.PI / 180;
+  let d360 = 2 * Math.PI;
+  let d180 = Math.PI;
+
+  let x = cx + inR * Math.cos(0);
+  let y = cy + inR * Math.sin(0);
+  path1.moveTo(x,y);
+
+  let deltaA = Math.PI/numTeeth;
+
+  for (let i = 0; i < numTeeth; i++)
+    {
+      x = cx + inR * Math.cos(2 * i * deltaA + deltaA);
+      y = cy + inR * Math.sin(2 * i * deltaA + deltaA);
+      path1.lineTo(x,y);
+
+      x = cx + outR * Math.cos(2 * i * deltaA + deltaA);
+      y = cy + outR * Math.sin(2 * i * deltaA + deltaA);
+      path1.lineTo(x,y);
+
+      x = cx + outR * Math.cos(2 * i * deltaA + deltaA + deltaA);
+      y = cy + outR * Math.sin(2 * i * deltaA + deltaA + deltaA);
+      path1.lineTo(x,y);
+
+      x = cx + inR * Math.cos(2 * i * deltaA + deltaA + deltaA);
+      y = cy + inR * Math.sin(2 * i * deltaA + deltaA + deltaA);
+      path1.lineTo(x,y);
+    }
+
+  path1.closePath();
+  ctx.lineWidth = 1.5;
+  ctx.stroke(path1);
+
+  // Now the triangular teeth.
+  numTeeth = 21;
+  cx = 230;
+  outR = 60;
+
+  path1 = new FPath();
+  path1.ellipse(cx,cy,2,2,0,0,2*Math.PI);
+  ctx.fill(path1);
+
+  path1 = new FPath();
+
+  x = cx + + inR * Math.cos(0);
+  y = cy + inR * Math.sin(0);
+  path1.moveTo(x,y);
+
+  for (let i = 0; i < numTeeth; i++)
+    {
+      x = cx + outR * Math.cos(i * d360/numTeeth + d180/numTeeth);
+      y = cy + outR * Math.sin(i * d360/numTeeth + d180/numTeeth);
+      path1.lineTo(x,y);
+
+      x = cx + inR * Math.cos((i+1) * d360/numTeeth);
+      y = cy + inR * Math.sin((i+1) * d360/numTeeth);
+      path1.lineTo(x,y);
+    }
+  path1.closePath();
+  ctx.stroke(path1);
+}
+
