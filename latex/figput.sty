@@ -1,0 +1,682 @@
+
+% We need to know the vertical position on the page where the figures
+% are located. Because this position can't be known until the page is
+% fully composed ("shipout"), the value is only accurate after the
+% second run, just like the \ref command. The value from the previous
+% run is available in the .aux file.
+\RequirePackage{zref-savepos}
+
+% The zref package also provides the page number. It gives the
+% absolute page number, not the logical page number. Things like the
+% table of contents and preface are part of the count. This value is
+% available from abspage. This number is zero-based, so that the
+% "first" page is numbered as zero. Just as positions within a page
+% are not really known until a page is shipped out, the page number
+% isn't known either. Generally, if you're near the middle or the end
+% of the page, then \thepage or abspage is correct, but it is often
+% wrong near the top of the page. The only way around this seems to be
+% to place a label on the page, in a manner similar to what is done
+% for positions within the page.
+\RequirePackage{zref-thepage}
+\RequirePackage{zref-abspage}
+\RequirePackage{zref-user}
+\RequirePackage{zref-pagelayout}
+\RequirePackage{xsim}
+\RequirePackage{tikz}
+
+% This is needed to help with the process of replacing the body of
+% the environment and (optionally) copying it to an external file.
+\RequirePackage{verbatim}
+
+
+\ExplSyntaxOn
+
+% The fig.aux file is open throughout the run.
+\iow_new:N \g_figurefile_iow
+\iow_open:Nn \g_figurefile_iow { \jobname.fig.aux }
+
+% The inner and outer margin widths
+\dim_new:N \l_figput_innermargin_dim
+\dim_new:N \l_figput_outermargin_dim
+
+% By default, set these margins to have zero width. This has no effect
+% on how the text is laid out by latex. It's used on the browser end
+% to set the origin for drawing. In turn, that affects where the
+% figures end up when the tikz is loaded.
+%
+% BUG: There should be a way (?) to determine where the left margin of
+% the text is from latex instead of inputing your best approximation.
+% At the same time, the user might want to adjust this regardless.
+\dim_set:Nn \l_figput_innermargin_dim { 0 pt }
+\dim_set:Nn \l_figput_outermargin_dim { 0 pt }
+
+% Two little commands to set these values.
+\NewDocumentCommand\SetInnerMargin { m }
+{
+  \dim_set:Nn \l_figput_innermargin_dim { #1 }
+}
+
+\NewDocumentCommand\SetOuterMargin { m }
+{
+  \dim_set:Nn \l_figput_outermargin_dim { #1 }
+}
+
+% Use this to turn off any of the optional "skip" arguments to figput.
+% If you call \NeverSkip, then these "skip" arguments are ignored.
+\bool_new:N \l_figput_skipoff_bool
+\bool_set_false:N \l_figput_skipoff_bool
+
+\NewDocumentCommand\NeverSkip{} {
+  \bool_set_true:N \l_figput_skipoff_bool
+}
+
+\NewDocumentCommand\AllowSkip{} {
+  \bool_set_false:N \l_figput_skipoff_bool
+}
+
+% Use this to request that a specific file be loaded by the browser.
+% This simply writes a line to the .aux file.
+\NewDocumentCommand\LoadFigureCode{ m }
+{
+  \group_begin:
+  
+  \iow_now:Nx \g_figurefile_iow { load~ #1 }
+  
+  \group_end:
+}
+
+
+% The variables used below:
+%
+% Manditory name for the figure, as given by the user. Using string,
+% although maybe token list would be better?
+\str_new:N \l_figput_figname_str
+
+% The manditory height given by the user. This is a dim, as opposed to
+% merely a floating-point value. 
+\dim_new:N \l_figput_height_dim
+
+% The optional height adjustments given by the user. Again, dims.
+\dim_new:N \l_figput_htAbove_dim
+\dim_new:N \l_figput_htBelow_dim
+
+% Scratch values used for calculation of figure position.
+\tl_new:N \l_figput_tempa_tl
+\tl_new:N \l_figput_tempb_tl
+\tl_new:N \l_figput_tempc_tl
+
+% And several booleans.
+% BUG: In theory, it would be possible to get rid of nostatic.
+% If the figure height is set to zero, then that should implicitly
+% imply nostatic.
+\bool_new:N \l_figput_hasintht_bool
+\bool_new:N \l_figput_nostatic_bool
+\bool_new:N \l_figput_done_bool
+\bool_new:N \l_figput_skip_bool
+
+% This is for the figures file: the position of the figure on the page.
+\dim_new:N \l_figput_pagepos_dim
+
+% BUG: I don't understand the whole concept of these variants of
+% functions. Somehow it deals with various cases of whether arguments 
+% are expanded or not. There's another variant defintion below as well.
+\cs_generate_variant:Nn \file_if_exist:nTF {V}
+\cs_generate_variant:Nn \file_input:n {V}
+
+
+
+% This command works in (almost) exactly the same way as the figput 
+% environment. The differenence is that, as a command instead of
+% an environment, there is no body to deal with. Most of the comments
+% have been removed. See the definition of the environment for *much*
+% more detailed comments.
+%
+% BUG: possible to define a function and combine these?
+\NewDocumentCommand\FigPut { > { \SplitArgument { 1 } { , } } m!o }
+{
+  \group_begin:
+
+  % The manditory arguments come in in #1
+  \figput_manargs #1
+
+  % Now the optional arguments.
+  \bool_set_false:N \l_figput_hasintht_bool
+  \bool_set_false:N \l_figput_nostatic_bool
+  \bool_set_false:N \l_figput_done_bool
+  \bool_set_false:N \l_figput_skip_bool
+  
+  \tl_if_blank:nTF { #2 } {} {
+    \clist_set:Nn \l_figput_optclist_clist { #2 }
+    \figput_optargs { } 
+  }
+
+  % We have everything needed to know what to do.
+  \str_set:Nx \l_figput_filespec_str { 
+    \use:c { zref@extractdefault } { \l_figput_figname_str -pageno} { abspage } { 0 }
+  }
+
+  % The inner and outer margins.
+  \str_put_right:Nx \l_figput_filespec_str { ~ \dim_to_decimal_in_bp:n \l_figput_innermargin_dim }
+  \str_put_right:Nx \l_figput_filespec_str { ~ \dim_to_decimal_in_bp:n \l_figput_outermargin_dim }
+
+  % And the text width.
+  \str_put_right:Nx \l_figput_filespec_str { ~ \dim_to_decimal_in_bp:n \textwidth }
+
+  % Massive fooling around to do arithmetic on page position.
+  \tl_set:Nn \l_figput_tempa_tl { \zposy { \l_figput_figname_str } }
+  % Convert the figure height to sp.
+  \tl_set:Nn \l_figput_tempb_tl { \dim_to_decimal_in_sp:n{ \l_figput_height_dim } }
+  % Add 
+  \tl_set:Nn \l_figput_tempc_tl { \int_eval:n { \l_figput_tempa_tl + \l_figput_tempb_tl } }
+  % Convert to a dim
+  \dim_set:Nn \l_figput_pagepos_dim { \l_figput_tempc_tl sp }
+  % And (whew!) write it out, in bp.
+  \str_put_right:Nx \l_figput_filespec_str { ~ \dim_to_decimal_in_bp:n \l_figput_pagepos_dim }
+
+  % The latex height of the figure (in bp)
+  \str_put_right:Nx \l_figput_filespec_str { ~ \dim_to_decimal_in_bp:n \l_figput_height_dim }
+
+  % The interactive height paddings, which are zero by default.
+  \bool_if:NTF \l_figput_hasintht_bool
+  { 
+    \str_put_right:Nx \l_figput_filespec_str { ~ \dim_to_decimal_in_bp:n \l_figput_htAbove_dim }
+    \str_put_right:Nx \l_figput_filespec_str { ~ \dim_to_decimal_in_bp:n \l_figput_htBelow_dim }
+  }
+  {
+    \str_put_right:Nx \l_figput_filespec_str { ~0~0 }
+  }
+
+  % The figure name -- used for the JS function to call.
+  \str_put_right:Nx \l_figput_filespec_str { ~ \l_figput_figname_str }
+
+  % And a boolean for whether the tikz is 'done.'
+  \bool_if:NTF \l_figput_done_bool
+  {
+    \str_put_right:Nx \l_figput_filespec_str { ~ true }
+  }
+  {
+    \str_put_right:Nx \l_figput_filespec_str { ~ false }
+  }
+  
+  % And indicate that this function must appear in an external file.
+  % It is not (false) to be loaded from a seperate file.
+  \str_put_right:Nx \l_figput_filespec_str { ~ false }
+
+  % String is ready. Write out the line.
+  \iow_now:Nx \g_figurefile_iow { \l_figput_filespec_str }
+  
+  % That's it for the figures.aux file. Next is the tikz.
+  % Above is identical to the environment code, but the following differs
+  % slightly since there is no body.
+  \bool_set_true:N \l_figput_readtikz_bool
+  
+  \bool_if:NTF \l_figput_skip_bool
+  {
+    \bool_set_false:N \l_figput_readtikz_bool
+  }
+  {}
+
+  % In the environment definition, this was part of the "post body"
+  % set of commands.
+  \bool_if:NTF \l_figput_nostatic_bool
+  {
+    % nostatic is set, so do nothing at all -- no figure in the static version.
+  }
+  {
+    % nostatic is not set, so there is a figure.
+    \str_set_eq:NN \l_figput_tikzfile_str \l_figput_figname_str
+    \str_put_right:Nn \l_figput_tikzfile_str { .tikz }
+
+    % Whether to read the tikz file or display a "not available" message
+    % depends on whether the tikz file exists and whether skip was set.
+    \file_if_exist:VTF \l_figput_tikzfile_str
+    {
+      % Yes, tikz exists, although we may not read it if skip is set.
+    }
+    {
+      % Tikz file doesn't exist, so we can't read it in any case.
+      \bool_set_false:N \l_figput_readtikz_bool
+    }
+    
+    \bool_if:NTF \l_figput_readtikz_bool
+    {
+      % Load the tikz file here.
+      \file_input:V \l_figput_tikzfile_str
+    } 
+    {
+      % Not loading the tikz file. Display a big empty box.
+      \begin{tikzpicture}
+        \useasboundingbox (0pt,0pt) rectangle (\textwidth,\l_figput_height_dim);
+        \draw[dashed] (0pt,0pt) rectangle ( \textwidth,\l_figput_height_dim);
+        \node at (\textwidth / 2,\l_figput_height_dim / 2) {The\ drawing\ is\ not\ available\ to\ load.};
+        \draw (5pt,5pt) rectangle ( \textwidth - 5,\l_figput_height_dim - 5);
+      \end{tikzpicture}
+    }
+
+    % End of figure inclusion -- nostatic is not set.
+  }
+  
+  % Note the figures location as of after the figure.
+  \par\zsaveposy { \l_figput_figname_str }
+  \zlabel{ \l_figput_figname_str -pageno}
+
+  \group_end:  
+}
+
+
+
+% See xparse for the top-level definition, \NewDocumentEnvironment and
+% its use of \SplitArgument. The gist is that there will be two
+% arguments, one for the manditory items (m), given in {}, and one for
+% the optional arguments (o), given in [].
+%
+% In theory, it is possible to take the body of the environment as an
+% argument, but that won't work if you want to receive the body
+% verbatim. Somehow, using xsim allows the body to be taken verbatim.
+%
+% Note also the ! that appears before the o. This is explained in the
+% xparse documentation. Without the !, if the user does not provide
+% any optional arguments, then any leading space in the body will be
+% eaten and disappear.
+
+\NewDocumentEnvironment{figput} { > { \SplitArgument { 1 } { , } } m!o }
+{
+  % I don't understand latex's concept of local variable, but
+  % this makes what follows local in some sense.
+  % BUG: Does this even matter? It looks like all my variables are in
+  % the figput module.
+  \group_begin:
+
+  % The manditory arguments come in in #1, but they have been
+  % broken up so that #1 "reads as" {first arg}{second arg}. By
+  % passing this to another function, it automatically breaks this
+  % into two distinct arguments. This seems a silly way, but it works.
+  % This sets \l_figput_figname_str and \l_figput_height_dim.
+  \figput_manargs #1
+
+  % Now the optional arguments. Start off with some default values.
+  % It looks like the htAbove and htBelow values are blank by default,
+  % which is what I want.
+  \bool_set_false:N \l_figput_hasintht_bool
+  \bool_set_false:N \l_figput_nostatic_bool
+  \bool_set_false:N \l_figput_done_bool
+  \bool_set_false:N \l_figput_skip_bool
+  
+  % Only try to set these values if there *were* some optional arguments,
+  % which come in as the #2 argument to figput.
+  % I set the clist here and "pass" it as global variable since I can't
+  % figure out how to pass the #2 argument directly. This works, but it
+  % is ugly. So this does nothing if the #2 argument is empty, leaving
+  % the boolean values as set above. Otherwise, it reads in the
+  % height adjustments and sets the boolean values above.
+  \tl_if_blank:nTF { #2 } {} {
+    \clist_set:Nn \l_figput_optclist_clist { #2 }
+    \figput_optargs { } 
+  }
+
+  % We have everything needed to know what to do. Prepare to write the
+  % data to the figures file. It seems that the easiest way to do this
+  % is to build up the string, then write it out. Getting spaces right
+  % is hard when I tried to write each bit directly to the file.
+  % Unravelling what's actually written and its meaning is hard to do
+  % here. It's easier to understand the js code that reads this output.
+  
+  % Need the position on the page. This saves it (for the next run).
+  % Just as for the page number (see below), it turns out that this
+  % shouldn't be done here; if it is, the figures at the bottom of the page are
+  % improperly positioned. This is done *after* the environment closes.
+  %\zsaveposy { \l_figput_figname_str }
+  
+  % And this gets the value from the previous run.
+  % This value is relative to the bottom of the page (normal axes)
+  % See below. The possibility of a figure at the bottom of the page
+  % requires a bit of trickery.
+  %\dim_set:Nn \l_figput_pagepos_dim { \zposy { \l_figput_figname_str } sp}
+
+  % Getting the page number correct is fiddly. We need to place a
+  % label at this location, and this label is updated at shipout.
+  % Because I am using the figure name as the label for the vertical
+  % position, I add a suffix ("-pageno") to distinguish this label.
+  % Originally, I had this line here, but that doesn't work because
+  % the page number is that at which the environment "opens" rather
+  % than when it "closes." If the figure is at the bottom of the page,
+  % then it seems that you get the page prior to the one you want.
+  %\zlabel{ \l_figput_figname_str -pageno}
+
+  % I would have thought that saying
+  % \zref[abspage]{ \l_figput_figname_str }
+  % would work, but it's not properly expanded. It *does* work to say
+  % the above and have it appear as a number on the page. I don't fully
+  % understand what the bit below does, but it works.
+  \str_set:Nx \l_figput_filespec_str { 
+    \use:c { zref@extractdefault } { \l_figput_figname_str -pageno} { abspage } { 0 }
+  }
+
+  % The inner and outer margins.
+  \str_put_right:Nx \l_figput_filespec_str { ~ \dim_to_decimal_in_bp:n \l_figput_innermargin_dim }
+  \str_put_right:Nx \l_figput_filespec_str { ~ \dim_to_decimal_in_bp:n \l_figput_outermargin_dim }
+
+  % And the text width.
+  \str_put_right:Nx \l_figput_filespec_str { ~ \dim_to_decimal_in_bp:n \textwidth }
+
+  % Use tilde (~) to get a space in the string, and convert to bp (big
+  % points). Fortunately, this eliminates the "bp" suffix too.
+  % There is a problem here, related to whether the figure is at the
+  % bottom of the page and gets bumped to the next page.
+  % I want to know the location of the top of the figure relative to
+  % the page on which it appears. The way to get the position on the
+  % page is with \zsaveposy. The problem is that if I want this
+  % location *before* the figure, then you get the bottom of the text
+  % immediately before the figure; if you ask for this location
+  % *after* the figure (or from within the figure), then you get the
+  % location of the bottom edge of the figure.
+  %
+  % The solution is to get the location of the bottom edge of the
+  % figure, then subtract the known figure height -- actually we *add*
+  % because we are in "normal" coordinates. We want to move up on the
+  % page.
+  %
+  % So, get the value from the previous run, in sp (small or scaled points).
+  \tl_set:Nn \l_figput_tempa_tl { \zposy { \l_figput_figname_str } }
+  % Convert the figure height to sp.
+  \tl_set:Nn \l_figput_tempb_tl { \dim_to_decimal_in_sp:n{ \l_figput_height_dim } }
+  % Add 
+  \tl_set:Nn \l_figput_tempc_tl { \int_eval:n { \l_figput_tempa_tl + \l_figput_tempb_tl } }
+  % Convert to a dim
+  \dim_set:Nn \l_figput_pagepos_dim { \l_figput_tempc_tl sp }
+  % And (whew!) write it out, in bp.
+  \str_put_right:Nx \l_figput_filespec_str { ~ \dim_to_decimal_in_bp:n \l_figput_pagepos_dim }
+
+  % The latex height of the figure (in bp)
+  \str_put_right:Nx \l_figput_filespec_str { ~ \dim_to_decimal_in_bp:n \l_figput_height_dim }
+
+  % The interactive height paddings, which are zero by default.
+  \bool_if:NTF \l_figput_hasintht_bool
+  { 
+    \str_put_right:Nx \l_figput_filespec_str { ~ \dim_to_decimal_in_bp:n \l_figput_htAbove_dim }
+    \str_put_right:Nx \l_figput_filespec_str { ~ \dim_to_decimal_in_bp:n \l_figput_htBelow_dim }
+  }
+  {
+    \str_put_right:Nx \l_figput_filespec_str { ~0~0 }
+  }
+
+  % The figure name -- used for the JS function to call.
+  \str_put_right:Nx \l_figput_filespec_str { ~ \l_figput_figname_str }
+
+  % And a boolean
+  \bool_if:NTF \l_figput_done_bool
+  {
+    \str_put_right:Nx \l_figput_filespec_str { ~ true }
+  }
+  {
+    \str_put_right:Nx \l_figput_filespec_str { ~ false }
+  }
+
+  % We're making a seperate file for this particular function.
+  % Tell the browser (true) to load it.
+  \str_put_right:Nx \l_figput_filespec_str { ~ true }
+  
+  % String is ready. Write out the line.
+  \iow_now:Nx \g_figurefile_iow { \l_figput_filespec_str }
+  
+  % That's it for the fig.aux file. Next is the heavy lifting,
+  % making the environment shift blocks of text around. Exactly what
+  % to do depends on the optional flags.
+  %
+  % Ultimately, there are only two things we might do (plus nothing):
+  % write the body of the environment to a file, and/or read a tikz
+  % file in to replace the current body (which may be blank). The
+  % easiest way to manage these options is to set a couple of booleans
+  % to indicate whether we should do these two things.
+  \bool_set_true:N \l_figput_writebody_bool
+  \bool_set_true:N \l_figput_readtikz_bool
+
+  % Note that there is no need to check nostatic here.
+  
+  \bool_if:NTF \l_figput_skip_bool
+  {
+    % skip == true, so don't write body or read tikz.
+    \bool_set_false:N \l_figput_writebody_bool
+    \bool_set_false:N \l_figput_readtikz_bool
+  }
+  {}
+
+  \bool_if:NTF \l_figput_writebody_bool
+  {
+    % Yes, we are to write the body to an external file.
+    
+    % The output file name needs an extra ".fjs" on the end.
+    % I don't like using this suffix, but it's seems the least bad.
+    \str_set_eq:NN \l_figput_jinfile_str \l_figput_figname_str
+    \str_put_right:Nn \l_figput_jinfile_str { .fjs }
+  
+    % Whether to add an additional EOL to the output file depends on
+    % whether there were any optional arguments. That's what the boolean
+    % argument does here. It tells the writer whether to start off with
+    % an "extra" EOL.
+    \IfValueTF {#2}
+      { \xsim_file_write_start:nn { \c_true_bool } }
+      { \xsim_file_write_start:nn { \c_false_bool } }
+      { \l_figput_jinfile_str }
+  }
+  {
+    % Do not write the body to an external file, but it still needs
+    % to be "eaten" and thrown away; otherwise, it passes through
+    % and latex tries to make the JS code into part of the document.
+    % This uses the verbatim package.
+    \comment
+  }
+}{
+  % Post environment commands. Remember that the "execution" of an
+  % environment is divided into two parts.
+  \bool_if:NTF \l_figput_writebody_bool
+  {
+    % Stop writing the body since it's done.
+    \xsim_file_write_stop:
+  }
+  {
+    \endcomment
+  }
+
+  \bool_if:NTF \l_figput_nostatic_bool
+  {
+    % nostatic is set, so do nothing at all -- no figure in the static version.
+  }
+  {
+    % nostatic is not set, so there is a figure.
+
+    % And replace the current body with an external tikz file.
+    \str_set_eq:NN \l_figput_tikzfile_str \l_figput_figname_str
+    \str_put_right:Nn \l_figput_tikzfile_str { .tikz }
+
+    % Whether to read the tikz file or display a "not available" message
+    % depends on whether the tikz file exists and whether skip was set.
+    \file_if_exist:VTF \l_figput_tikzfile_str
+    {
+      % Yes, tikz exists, although we may not read it if skip is set.
+    }
+    {
+      % Tikz file doesn't exist, so we can't read it in any case.
+      \bool_set_false:N \l_figput_readtikz_bool
+    }
+    
+    \bool_if:NTF \l_figput_readtikz_bool
+    {
+      % Load the tikz file here.
+      \file_input:V \l_figput_tikzfile_str
+    } 
+    {
+      % Not loading the tikz file. Display a big empty box.
+      % The problem here is that I need to specify the size of the
+      % drawing, and tizk doesn't make that easy. It prefers to look at
+      % the drawing and determine the size based on what was actually
+      % drawn. It seems as though it is possible to *scale* a drawing to
+      % take a particular size, although simply specifying the size is
+      % hard. What does seem to work is one of the two following approaches.
+      % (1) If you want to "trick" latex into allocating a given area
+      % for the drawing, even if the drawing ends up going "outside the
+      % lines," then you can say (within the tikzpicture environment)
+      % \useasboundingbox (0pt,0pt) rectangle (100pt,200pt);
+      % or whatever the dimensions are. Use this on the first line.
+      % (2) This idea doesn't so much trick latex into using a particular
+      % vbox/hbox for the drawing as limit the drawing to the rectangle
+      % you want by clipping it. Here, as the first line of the drawing
+      % you say
+      % \clip (0,0) rectangle (100pt,200pt);
+      % and the drawing will be limited to that region. I suspect (?)
+      % that if the actual drawing is smaller than the clip region, the
+      % latex will reduce the size of the figure accordiningly. So (1)
+      % is probably the better solution.
+      
+      \begin{tikzpicture}
+        % The opposite corner is given by (width,height), and the width
+        % doesn't really matter since I assume that the figure spans the page.
+        % BUG: Maybe I should change this to bp?
+        % BUG: The right thing to do here is (?) to make the box match
+        % the settings for \l_figput_innermargin_dim and outermargin, but
+        % I think this requires that I know the page width.
+        \useasboundingbox (0pt,0pt) rectangle (\textwidth,\l_figput_height_dim);
+        
+        % I don't understand exactly how the figure is placed on the
+        % page, but this seems to work.
+        \draw[dashed] (0pt,0pt) rectangle ( \textwidth,\l_figput_height_dim);
+        
+        % It looks like the text is drawn so that the bounding box is
+        % centered at the given coordinates. Note how tikz lets you
+        % divide with a simple "/2". Nice.
+        %
+        % Note also that, because this is being done with \ExplSyntaxOn,
+        % the spaces in the text need to be \-spaces. Also, if I say
+        % \node[draw], then a box is drawn around the text.
+        \node at (\textwidth / 2,\l_figput_height_dim / 2) {The\ drawing\ is\ not\ available\ to\ load.};
+      
+        % For visual appeal, an extra enclosing rectangle.
+        % BUG: I might want to check how tall the figure is and adjust
+        % this box accordingly, or not show it at all if the box is very small.
+        \draw (5pt,5pt) rectangle ( \textwidth - 5,\l_figput_height_dim - 5);
+
+      \end{tikzpicture}
+    }
+
+    % End of figure inclusion -- nostatic is not set.
+  }
+  
+  % See above. I originally had these lines near the start of the
+  % process, but I had to put it here, as the very last thing, for the
+  % values to be correct. Otherwise figures at the very end of a
+  % page are assigned the page number prior to what it should be, and
+  % they end up on the bottom of that page.
+  %
+  % Wow, I really don't understand this, but somehow, adding the \par
+  % here serves to "quiet" another \par that would be inserted and
+  % that I do not want. Without this, it seems like there is an extra
+  % \par following the .tikz file when one is loaded. This solution
+  % was provided as the answer to my question 643125 on tex.stackexchagne.
+  % Apparently, it has something to do with \zsaveposy being a
+  % "whatsit" command. I haven't unravelled this fully, but it somehow
+  % explains what is going on.
+  \par\zsaveposy { \l_figput_figname_str }
+  \zlabel{ \l_figput_figname_str -pageno}
+
+  % Note that group_end occurs here. It can't appear above, in the
+  % pre-environment stuff because we still need access to some of the
+  % variables here, post-environment.
+  \group_end:  
+}
+
+% I wanted to define this with \cs_new, but lost patience with it.
+% This works, but it's probably not "the right way."
+\NewDocumentCommand{\figput_manargs}{ m m }
+{
+  % You need braces around #1 or you only get the first character.
+  \str_set:Nn \l_figput_figname_str { #1 }
+  \dim_set:Nn \l_figput_height_dim { #2 }
+}
+
+% This is to handle the optional arguments. It merely sets the
+% relevant variables. 
+\NewDocumentCommand{\figput_optargs} { }
+{
+  % Certain things are hard to do using a clist, so it's held as a seq
+  % too. Again, no doubt there is a  better way, but this works.
+  \seq_set_from_clist:NN \l_figput_optseq_seq { \l_figput_optclist_clist }
+  
+  % The first of the optional arguments might be a length. If it is, then
+  % we have two lengths (dims), for the additional space above/below when
+  % the figure is viewed interactively.
+  % 
+  % Note that one could make the call directly from the entire set of
+  % optional arguments with
+  %\figput_if_length:eTF { \clist_item:nn { #2 } { 1 } } {TRUE}{FALSE} \\
+  % However (!) this only works if the function if_length is defined
+  % with \prg_new_conditional:Nnn rather than
+  % \prg_new_protected_conditional. I have no idea what the difference
+  % is.
+  %
+  % Pull out the first of the optional arguments to make it easier to
+  % work with. Note that by using a copy of the data in a seq variable,
+  % I can pop things off without worrying about side-effects.
+  \seq_pop_left:NN \l_figput_optseq_seq \l_figput_firstvalue_tl
+
+  % If the first value parses out to be a dimension, then note that
+  % value as the height above and get the height below too.
+  \figput_if_length:VTF \l_figput_firstvalue_tl 
+  {
+    \dim_set:Nn \l_figput_htAbove_dim \l_figput_firstvalue_tl
+    \bool_set_true:N \l_figput_hasintht_bool
+    
+    % Get the second value (reusing the "firstvalue" variable).
+    \seq_pop_left:NN \l_figput_optseq_seq \l_figput_firstvalue_tl
+    \dim_set:Nn \l_figput_htBelow_dim \l_figput_firstvalue_tl
+  }
+  {
+    % If it's not a dimension, then ignore it for now.
+  }
+
+  % Check whether each possible boolean flag has been set.
+  % BUG: I should check whether the user passed in something
+  % spurious, and he might accidentally indicate the interactive
+  % heights out of order. As things stand now, the user could pass in
+  % "gibberish" as an option and it would be ignored. No harm done,
+  % but it could confuse the user.
+  \clist_if_in:NnTF \l_figput_optclist_clist { nostatic } 
+  {
+    \bool_set_true:N \l_figput_nostatic_bool
+  }{}
+  \clist_if_in:NnTF \l_figput_optclist_clist { done } 
+  {
+    \bool_set_true:N \l_figput_done_bool
+  }{}
+  \clist_if_in:NnTF \l_figput_optclist_clist { skip } 
+  {
+    % Note the test for whether \NeverSkip was called.
+    \bool_if:NTF \l_figput_skipoff_bool
+    {}{
+      \bool_set_true:N \l_figput_skip_bool
+    }
+  }{}
+}
+
+% This was a "top-level" command, defined with
+%\NewDocumentCommand{\iflengthTF}{mmm}
+% but that's really not the way to do this.
+%
+% Instead, we define a function "in the module" (figput), plus a
+% "variant." See p. 32 of the interface3 document.  For the initial
+% function (not the variant), see p. 62. I can't say that I really
+% understand what's going on here, other than a bit of copy and paste
+% and the help from stack overflow does it.
+\prg_new_protected_conditional:Nnn \figput_if_length:n { T, F, TF }
+ {
+  \regex_match:nnTF
+  % Note that I only allow positive values.
+   { \A [+]? ((\d+(\.\d*)?)|(\.\d+)) \s* (pt|pc|in|bp|cm|mm|dd|cc|sp|ex|em) \Z} 
+   { #1 } % test string
+   { \prg_return_true: }
+   { \prg_return_false: }
+ }
+ 
+\prg_generate_conditional_variant:Nnn \figput_if_length:n { V } { T, F, TF }
+
+
+\ExplSyntaxOff
